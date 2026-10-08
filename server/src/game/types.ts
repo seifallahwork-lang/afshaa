@@ -1,11 +1,14 @@
 /** Server-only room state. Stored in the Durable Object; never sent raw to clients. */
 import type { GameSettings } from "../../../shared/config";
-import type { Highlight, Phase, RoundResult } from "../../../shared/protocol";
+import type { Avatar } from "../../../shared/avatar";
+import type { MemeDesign } from "../../../shared/design";
+import type { Highlight, Phase, Rating, RoundResult } from "../../../shared/protocol";
 import type { MemeTemplate } from "../../../shared/templates";
 
 export interface PlayerState {
   id: string;
   name: string;
+  avatar: Avatar;
   /** Secret that lets this browser tab reclaim its seat after a refresh. */
   token: string;
   joinedAt: number;
@@ -19,12 +22,12 @@ export interface PlayerState {
 export interface SubmissionState {
   id: string;
   playerId: string;
-  caption: string;
+  design: MemeDesign;
   submittedAt: number;
 }
 
 export interface RoomState {
-  version: 2;
+  version: 3;
   code: string;
   createdAt: number;
   phase: Phase;
@@ -40,8 +43,12 @@ export interface RoomState {
   submissions: SubmissionState[];
   /** Shuffled submission ids — the anonymous order everybody sees. */
   revealOrder: string[];
-  /** voterId -> submissionId */
-  votes: Record<string, string>;
+  /** voterId -> (submissionId -> rating) */
+  ratings: Record<string, Record<string, Rating>>;
+  /** This round's AI hints: playerId -> hint (null text while the AI is thinking). */
+  hints: Record<string, { text: string | null }>;
+  /** AI hint per template id, so the AI runs once per meme. */
+  hintCache: Record<string, string>;
   lastRound: RoundResult | null;
   highlights: Highlight[];
   emptySince: number | null;

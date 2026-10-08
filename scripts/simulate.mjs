@@ -21,6 +21,10 @@ function check(label, cond, extra = "") {
   }
 }
 
+/** One-text-box meme. */
+const meme = (text) => ({ boxes: [{ id: "a", text, x: 5, y: 70, w: 90, h: 25, color: "#FFFFFF", bg: "transparent", rounded: false, size: 7 }], strokes: [] });
+const AVATAR = { bg: 1, skin: 2, hair: 3, hairColor: 1, eyes: 1, eyeColor: 2, mouth: 1, beard: 0, glasses: 1, hat: 2 };
+
 async function api(path, body) {
   const res = await fetch(`${SERVER}${path}`, {
     method: "POST",
@@ -83,26 +87,30 @@ async function until(fn, label, timeout = 15000) {
 }
 
 async function createRoom(hostName, n) {
-  const host = await api("/api/rooms", { name: hostName });
+  const host = await api("/api/rooms", { name: hostName, avatar: AVATAR });
   const players = [new Player(hostName, host.data)];
   for (let i = 1; i < n; i++) {
-    const r = await api(`/api/rooms/${host.data.code}/join`, { name: `لاعب${i}` });
+    const r = await api(`/api/rooms/${host.data.code}/join`, { name: `لاعب${i}`, avatar: AVATAR });
     players.push(new Player(`لاعب${i}`, r.data));
   }
   await Promise.all(players.map((p) => p.connect()));
   return { code: host.data.code, players, hostRes: host };
 }
 
+/** Rate every meme that isn't mine. */
+function rateAll(p, stars = 3) {
+  for (const s of p.state.submissions) {
+    if (s.id !== p.state.you.mySubmissionId && !p.state.you.myRatings[s.id]) p.send({ type: "rate", submissionId: s.id, stars });
+  }
+}
+
 async function playRound(players, { captions = true } = {}) {
   const [host] = players;
   await until(() => players.every((p) => p.state?.phase === "CAPTION"), "CAPTION");
-  if (captions) players.forEach((p, i) => p.send({ type: "submitCaption", caption: `${p.name}: لما الدكتور يقول ده سهل 😂 #${i}` }));
+  if (captions) players.forEach((p, i) => p.send({ type: "submitMeme", design: meme(`${p.name}: لما الدكتور يقول ده سهل 😂 #${i}`) }));
   await until(() => players.every((p) => p.state?.phase === "REVEAL"), "REVEAL");
   await until(() => players.every((p) => p.state?.phase === "VOTING"), "VOTING", 10000);
-  for (const p of players) {
-    const target = p.state.submissions.find((s) => s.id !== p.state.you.mySubmissionId);
-    if (target) p.send({ type: "vote", submissionId: target.id });
-  }
+  for (const p of players) rateAll(p, 4);
   await until(() => players.every((p) => p.state?.phase === "ROUND_RESULTS"), "ROUND_RESULTS");
   host.send({ type: "skip" });
 }
@@ -153,40 +161,59 @@ async function main() {
   await until(() => all.every((p) => p.state.phase === "CAPTION"), "CAPTION");
   check("caption phase has a meme template", Boolean(host.state.template?.image));
   const msgsBefore = p1.log.length;
-  host.send({ type: "submitCaption", caption: "سر_الكابشن_السري 🤫" });
+  host.send({ type: "submitMeme", design: meme("سر_الكابشن_السري 🤫") });
   await until(() => p1.state.players.find((p) => p.id === host.id)?.hasSubmitted, "submitted flag");
   check("others see THAT host submitted", true);
   check("…but never the caption text", !p1.log.slice(msgsBefore).some((m) => m.includes("سر_الكابشن_السري")));
-  host.send({ type: "submitCaption", caption: "تاني" });
+  host.send({ type: "submitMeme", design: meme("تاني") });
   await until(() => host.errors.includes("ALREADY_SUBMITTED"), "dup");
   check("duplicate submission prevented", host.errors.includes("ALREADY_SUBMITTED"));
 
-  for (const p of [p1, p2, lateP]) p.send({ type: "submitCaption", caption: `كابشن ${p.name} 😂 English mix ١٢٣` });
+  p1.send({ type: "submitMeme", design: { boxes: [{ text: "   " }], strokes: [] } });
+  await until(() => p1.errors.includes("EMPTY_CAPTION"), "empty");
+  check("empty meme is rejected", p1.errors.includes("EMPTY_CAPTION"));
+  p1.send({ type: "requestHint" });
+  await until(() => p1.errors.includes("HINT_UNAVAILABLE"), "hint");
+  check("AI hint safely unavailable for built-in templates (no charge)", p1.errors.includes("HINT_UNAVAILABLE") && p1.state.players.find((p) => p.id === p1.id).score === 0);
+  for (const p of [p1, p2, lateP]) p.send({ type: "submitMeme", design: meme(`كابشن ${p.name} 😂 English mix ١٢٣`) });
   await until(() => all.every((p) => p.state.phase === "REVEAL"), "REVEAL");
   check("all submitted → reveal early", all.every((p) => p.state.phase === "REVEAL"));
   check("reveal is anonymous", !JSON.stringify(p1.state.submissions).includes(host.id));
 
   await until(() => all.every((p) => p.state.phase === "VOTING"), "VOTING", 10000);
-  host.send({ type: "vote", submissionId: host.state.you.mySubmissionId });
+  host.send({ type: "rate", submissionId: host.state.you.mySubmissionId, stars: 5 });
   await until(() => host.errors.includes("CANNOT_VOTE_SELF"), "self vote");
-  check("cannot vote for own meme", host.errors.includes("CANNOT_VOTE_SELF"));
-  const target = (p) => p.state.submissions.find((s) => s.id !== p.state.you.mySubmissionId).id;
-  host.send({ type: "vote", submissionId: target(host) });
+  check("cannot rate own meme", host.errors.includes("CANNOT_VOTE_SELF"));
+  const firstOther = (p) => p.state.submissions.find((s) => s.id !== p.state.you.mySubmissionId).id;
+  host.send({ type: "rate", submissionId: firstOther(host), stars: 5, comment: "جامد 😂" });
   await sleep(200);
-  host.send({ type: "vote", submissionId: target(host) });
+  host.send({ type: "rate", submissionId: firstOther(host), stars: 1 });
   await until(() => host.errors.includes("ALREADY_VOTED"), "dup vote");
-  check("duplicate vote prevented", host.errors.includes("ALREADY_VOTED"));
+  check("rating the same meme twice is prevented", host.errors.includes("ALREADY_VOTED"));
+  host.send({ type: "rate", submissionId: firstOther(host), stars: 9 });
+  await sleep(150);
 
   // Player disconnects during voting → round still finishes.
   lateP.close();
   await until(() => host.state.players.find((p) => p.id === lateP.id)?.connected === false, "disconnect seen");
   check("disconnect is visible to others", host.state.players.find((p) => p.id === lateP.id)?.connected === false);
-  p1.send({ type: "vote", submissionId: target(p1) });
-  p2.send({ type: "vote", submissionId: target(p2) });
+  // host: 😡 on the next meme, stars on the rest
+  const hostOthers = host.state.submissions.filter((s) => s.id !== host.state.you.mySubmissionId && !host.state.you.myRatings[s.id]);
+  host.send({ type: "rate", submissionId: hostOthers[0].id, angry: true, comment: "مش ظريف" });
+  for (const s of hostOthers.slice(1)) host.send({ type: "rate", submissionId: s.id, stars: 2 });
+  await sleep(200);
+  rateAll(p1, 3);
+  rateAll(p2, 3);
   await until(() => host.state.phase === "ROUND_RESULTS", "results");
-  check("round results after voting", host.state.phase === "ROUND_RESULTS");
-  const totalVotes = host.state.lastRound.entries.reduce((a, e) => a + e.votes, 0);
-  check("3 votes counted, points = votes", totalVotes === 3 && host.state.players.reduce((a, p) => a + p.score, 0) === 3);
+  check("round results after everyone rated", host.state.phase === "ROUND_RESULTS");
+  const entries = host.state.lastRound.entries;
+  const angryTotal = entries.reduce((a, e) => a + e.angry, 0);
+  const commentFound = entries.some((e) => e.comments.some((c) => c.text === "جامد 😂"));
+  check("😡 recorded and comments shown with names", angryTotal === 1 && commentFound);
+  const pointsSum = entries.reduce((a, e) => a + e.points, 0);
+  const starsSum = entries.reduce((a, e) => a + e.stars, 0);
+  check("points = stars − 2 per 😡", pointsSum === starsSum - 2, `${pointsSum} vs ${starsSum}`);
+  check("avatars travel with players", JSON.stringify(host.state.players[0].avatar) === JSON.stringify(AVATAR));
 
   // Refresh: reconnect with the same token keeps the seat and score.
   const scoreBefore = host.state.players.find((p) => p.id === lateP.id).score;
@@ -222,11 +249,11 @@ async function main() {
   check("host settings sync to everyone", t.players[1].state.settings.captionSeconds === 30);
   t.players[0].send({ type: "start" });
   await until(() => t.players[0].state.phase === "CAPTION", "caption");
-  t.players[0].send({ type: "submitCaption", caption: "أنا بس اللي كتبت" });
+  t.players[0].send({ type: "submitMeme", design: meme("أنا بس اللي كتبت") });
   const endsAt = t.players[0].state.phaseEndsAt;
   await until(() => t.players.every((p) => p.state.phase === "REVEAL"), "timer expiry", 40000);
   check("timer expiry closes captions (server-side)", t.players[1].state.phase === "REVEAL" && Date.now() >= endsAt - 1500);
-  t.players[1].send({ type: "submitCaption", caption: "متأخر" });
+  t.players[1].send({ type: "submitMeme", design: meme("متأخر") });
   await until(() => t.players[1].errors.includes("WRONG_PHASE"), "late");
   check("late submission rejected", t.players[1].errors.includes("WRONG_PHASE"));
   t.players.forEach((p) => p.close());

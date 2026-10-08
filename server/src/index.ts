@@ -56,13 +56,13 @@ function json(body: unknown, status: number, origin: string | null): Response {
 const fail = (code: ErrorCode, origin: string | null) =>
   json({ error: code } satisfies ApiError, STATUS[code] ?? 500, origin);
 
-async function readName(request: Request): Promise<unknown> {
+async function readBody(request: Request): Promise<{ name?: unknown; avatar?: unknown }> {
   const text = await request.text();
-  if (text.length > MAX_BODY) return null;
+  if (text.length > MAX_BODY) return {};
   try {
-    return (JSON.parse(text) as { name?: unknown }).name;
+    return JSON.parse(text) ?? {};
   } catch {
-    return null;
+    return {};
   }
 }
 
@@ -89,10 +89,10 @@ export default {
 
     // POST /api/rooms — create a room with a fresh, unused 6-digit code.
     if (parts.length === 2 && request.method === "POST") {
-      const name = await readName(request);
+      const { name, avatar } = await readBody(request);
       for (let attempt = 0; attempt < 15; attempt++) {
         const code = randomRoomCode();
-        const result = await roomStub(env, code).create(code, name);
+        const result = await roomStub(env, code).create(code, name, avatar);
         if (result.ok) return json(result.value, 201, origin);
         if (result.error !== "CODE_IN_USE") return fail(result.error, origin);
       }
@@ -104,8 +104,8 @@ export default {
 
     // POST /api/rooms/:code/join
     if (parts[3] === "join" && request.method === "POST") {
-      const name = await readName(request);
-      const result = await roomStub(env, code).join(name);
+      const { name, avatar } = await readBody(request);
+      const result = await roomStub(env, code).join(name, avatar);
       return result.ok ? json(result.value, 200, origin) : fail(result.error, origin);
     }
 

@@ -12,7 +12,6 @@ import { DurableObject } from "cloudflare:workers";
 import { CLOSE_CODES, type ClientMessage, type ErrorCode, type ServerMessage, type SessionResponse } from "../../shared/protocol";
 import {
   addPlayer,
-  castVote,
   createRoomState,
   findByToken,
   findPlayer,
@@ -21,10 +20,14 @@ import {
   markDisconnected,
   nextWakeAt,
   playAgain,
+  rate,
+  refundHint,
+  requestHint,
+  resolveHint,
   returnToLobby,
   skip,
   startGame,
-  submitCaption,
+  submitMeme,
   tick,
   updateSettings,
 } from "./game/engine";
@@ -32,10 +35,11 @@ import { GameError } from "./game/errors";
 import type { RoomState } from "./game/types";
 import { buildView } from "./game/view";
 import { getTemplates } from "./templates/source";
+import { generateHint, HintUnavailable } from "./ai/hint";
 import type { Env } from "./env";
 
 const STATE_KEY = "state";
-const MAX_MESSAGE_BYTES = 4096;
+const MAX_MESSAGE_BYTES = 48 * 1024; // a meme with drawings can be a few KB
 
 type Attachment = { playerId: string };
 
@@ -49,7 +53,7 @@ export class GameRoom extends DurableObject<Env> {
     ctx.blockConcurrencyWhile(async () => {
       const saved = (await ctx.storage.get<RoomState>(STATE_KEY)) ?? null;
       // Rooms saved by an older version of the game are discarded (rooms are temporary anyway).
-      this.state = saved && saved.version === 2 ? saved : null;
+      this.state = saved && saved.version === 3 ? saved : null;
     });
     // Heartbeats are answered by Cloudflare without waking the room.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
@@ -58,13 +62,13 @@ export class GameRoom extends DurableObject<Env> {
   /* ---------------- RPC (called by the Worker) ---------------- */
 
   /** Create this room with its host. Fails if the code is already in use. */
-  async create(code: string, hostName: unknown): Promise<RpcResult<SessionResponse>> {
+  async create(code: string, hostName: unknown, avatar?: unknown): Promise<RpcResult<SessionResponse>> {
     const now = Date.now();
     if (this.state && !tick(this.state, now)) return { ok: false, error: "CODE_IN_USE" }; // collision → the Worker retries with a new code
     await this.destroy(false);
     const s = createRoomState(code, now);
     try {
-      const host = addPlayer(s, hostName, now);
+      const host = addPlayer(s, hostName, now, avatar);
       this.state = s;
       await this.commit(now);
       return { ok: true, value: { code, playerId: host.id, token: host.token } };
@@ -73,7 +77,7 @@ export class GameRoom extends DurableObject<Env> {
     }
   }
 
-  async join(name: unknown): Promise<RpcResult<SessionResponse>> {
+  async join(name: unknown, avatar?: unknown): Promise<RpcResult<SessionResponse>> {
     const now = Date.now();
     const s = this.state;
     if (!s) return { ok: false, error: "ROOM_NOT_FOUND" };
@@ -83,7 +87,7 @@ export class GameRoom extends DurableObject<Env> {
       return { ok: false, error: "ROOM_NOT_FOUND" };
     }
     try {
-      const p = addPlayer(s, name, now);
+      const p = addPlayer(s, name, now, avatar);
       await this.commit(now);
       return { ok: true, value: { code: s.code, playerId: p.id, token: p.token } };
     } catch (e) {
@@ -152,12 +156,15 @@ export class GameRoom extends DurableObject<Env> {
         case "updateSettings":
           updateSettings(s, playerId, msg.settings);
           break;
-        case "submitCaption":
-          submitCaption(s, playerId, msg.caption, now);
+        case "submitMeme":
+          submitMeme(s, playerId, msg.design, now);
           break;
-        case "vote":
-          castVote(s, playerId, msg.submissionId, now);
+        case "rate":
+          rate(s, playerId, msg, now);
           break;
+        case "requestHint":
+          await this.handleHint(ws, s, playerId, now);
+          return; // handleHint commits itself
         case "skip":
           skip(s, playerId, now);
           break;
@@ -204,6 +211,41 @@ export class GameRoom extends DurableObject<Env> {
     await this.commit(now);
   }
 
+  /* ---------------- AI hint ---------------- */
+
+  private hintsEnabled(): boolean {
+    return Boolean(this.env.AI) && Boolean(this.state?.currentTemplate?.image.startsWith("http"));
+  }
+
+  /** Charge 10 points, show "thinking…", ask the AI, then show the hint (or refund on failure). */
+  private async handleHint(ws: WebSocket, s: RoomState, playerId: string, now: number): Promise<void> {
+    const template = s.currentTemplate;
+    if (!template || !this.hintsEnabled()) {
+      this.sendError(ws, "HINT_UNAVAILABLE");
+      return;
+    }
+    let cached: string | null;
+    try {
+      cached = requestHint(s, playerId, now);
+    } catch (e) {
+      this.sendError(ws, e instanceof GameError ? e.code : "SERVER_ERROR");
+      return;
+    }
+    await this.commit(now); // everyone sees the new score; the player sees "thinking…"
+    if (cached) return;
+
+    const round = s.round;
+    try {
+      const text = await generateHint(this.env.AI, template);
+      if (this.state) resolveHint(this.state, playerId, round, template.id, text);
+    } catch (e) {
+      console.error("AI hint failed", e);
+      if (this.state) refundHint(this.state, playerId, round);
+      this.sendError(ws, e instanceof HintUnavailable ? "HINT_UNAVAILABLE" : "HINT_FAILED");
+    }
+    await this.commit(Date.now());
+  }
+
   /* ---------------- Timers ---------------- */
 
   async alarm(): Promise<void> {
@@ -248,7 +290,7 @@ export class GameRoom extends DurableObject<Env> {
         this.safeClose(ws, CLOSE_CODES.INVALID_TOKEN, "INVALID_TOKEN");
         continue;
       }
-      const msg: ServerMessage = { type: "state", state: buildView(s, playerId), serverNow: now };
+      const msg: ServerMessage = { type: "state", state: buildView(s, playerId, this.hintsEnabled()), serverNow: now };
       try {
         ws.send(JSON.stringify(msg));
       } catch {

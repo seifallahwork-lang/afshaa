@@ -1,5 +1,6 @@
 import { CAPTION_SECONDS_OPTIONS, GAME_CONFIG, ROUND_OPTIONS, VOTING_SECONDS_OPTIONS } from "@shared/config";
 import { useState } from "react";
+import { DeveloperButton } from "../components/DeveloperCard";
 import { PlayerList } from "../components/game";
 import { Button, Panel, Segmented } from "../components/ui";
 import { t } from "../i18n/ar";
@@ -112,6 +113,7 @@ export function LobbyScreen({ state, send, onLeave }: ScreenProps) {
           {t.leave}
         </button>
       </div>
+      <DeveloperButton inline />
     </div>
   );
 }

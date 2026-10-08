@@ -1,12 +1,19 @@
-import { MemeCard } from "../components/MemeCard";
+import { useEffect } from "react";
+import { Avatar } from "../components/Avatar";
+import { MemeView } from "../components/MemeView";
 import { Leaderboard, rankPlayers } from "../components/game";
 import { Button, Panel } from "../components/ui";
 import { t } from "../i18n/ar";
+import { sound } from "../lib/sound";
 import type { ScreenProps } from "./types";
 
 export function FinalScreen({ state, send, onLeave }: ScreenProps) {
   const ranked = rankPlayers(state.players);
   const winners = ranked.filter((p) => p.rank === 1 && p.score > 0);
+
+  useEffect(() => {
+    sound.sfx("fanfare");
+  }, []);
 
   return (
     <div className="stack">
@@ -17,6 +24,11 @@ export function FinalScreen({ state, send, onLeave }: ScreenProps) {
         <p className="trophy-label">{winners.length > 1 ? t.winners : t.winner}</p>
         {winners.length > 0 ? (
           <>
+            <div className="winner-avatars">
+              {winners.map((w) => (
+                <Avatar key={w.id} avatar={w.avatar} size={112} />
+              ))}
+            </div>
             <h1 className="trophy-name">{winners.map((w) => w.name).join(" و ")}</h1>
             <p className="trophy-score">{t.points(winners[0].score)}</p>
           </>
@@ -38,9 +50,9 @@ export function FinalScreen({ state, send, onLeave }: ScreenProps) {
           <div className="meme-grid count-2">
             {state.highlights.map((h) => (
               <figure key={h.round} className="highlight">
-                <MemeCard template={h.template} caption={h.caption} />
+                <MemeView template={h.template} design={h.design} />
                 <figcaption>
-                  {t.roundOf(h.round, state.totalRounds)}: <strong>{h.playerName}</strong> ({t.votes(h.votes)})
+                  {t.roundOf(h.round, state.totalRounds)}: <strong>{h.playerName}</strong> ({t.points(h.points)})
                 </figcaption>
               </figure>
             ))}

@@ -1,8 +1,12 @@
-import { MemeCard } from "../components/MemeCard";
+import { GAME_CONFIG } from "@shared/config";
+import { useEffect } from "react";
+import { Avatar } from "../components/Avatar";
+import { MemeView } from "../components/MemeView";
 import { Leaderboard, MEDALS } from "../components/game";
 import { Button, Panel } from "../components/ui";
 import { useCountdown } from "../hooks/useCountdown";
 import { t } from "../i18n/ar";
+import { sound } from "../lib/sound";
 import type { ScreenProps } from "./types";
 
 export function RoundResultsScreen({ state, send, clockOffset }: ScreenProps) {
@@ -10,7 +14,11 @@ export function RoundResultsScreen({ state, send, clockOffset }: ScreenProps) {
   const result = state.lastRound;
   const isLast = state.round >= state.totalRounds;
   const top = result?.entries[0];
-  const hasWinner = Boolean(top && top.votes > 0);
+  const hasWinner = Boolean(result && result.winnerIds.length > 0 && top);
+
+  useEffect(() => {
+    sound.sfx(hasWinner ? "fanfare" : "submit");
+  }, [hasWinner, state.round]);
 
   return (
     <div className="stack">
@@ -21,10 +29,14 @@ export function RoundResultsScreen({ state, send, clockOffset }: ScreenProps) {
 
       {result && top && hasWinner ? (
         <div className="winner-meme">
-          <MemeCard template={result.template} caption={top.caption} className="meme-hero" />
+          <MemeView template={result.template} design={top.design} className="meme-hero" />
           <p className="winner-line">
-            🏆 {result.winnerIds.length > 1 ? result.entries.filter((e) => result.winnerIds.includes(e.playerId)).map((e) => e.playerName).join(" و ") : top.playerName}
-            <span> — {t.votes(top.votes)}</span>
+            🏆{" "}
+            {result.entries
+              .filter((e) => result.winnerIds.includes(e.playerId))
+              .map((e) => e.playerName)
+              .join(" و ")}
+            <span> — {t.points(top.points)}</span>
           </p>
         </div>
       ) : (
@@ -38,17 +50,40 @@ export function RoundResultsScreen({ state, send, clockOffset }: ScreenProps) {
           <ol className="round-entries">
             {result.entries.map((e, i) => (
               <li key={e.submissionId}>
-                <span className="lb-rank">{e.votes > 0 ? (MEDALS[i] ?? i + 1) : "·"}</span>
-                <div className="entry-body">
-                  <strong>{e.playerName}</strong>
-                  <span className="entry-caption" dir="auto">
-                    {e.caption}
+                <div className="entry-head">
+                  <span className="lb-rank">{e.points > 0 ? (MEDALS[i] ?? i + 1) : "·"}</span>
+                  <Avatar avatar={e.avatar} size={36} />
+                  <strong className="entry-name">{e.playerName}</strong>
+                  <span className="entry-stats">
+                    ⭐ {e.stars}
+                    {e.angry > 0 && <> · 😡 {e.angry}</>}
+                  </span>
+                  <span className={`entry-points ${e.points < 0 ? "neg" : ""}`}>
+                    {e.points > 0 ? "+" : ""}
+                    {e.points}
                   </span>
                 </div>
-                <span className="entry-points">+{t.points(e.points)}</span>
+                {e.comments.length > 0 && (
+                  <ul className="comments">
+                    {e.comments.map((c, j) => (
+                      <li key={j}>
+                        <q dir="auto">{c.text}</q>
+                        <small>
+                          {" "}
+                          — {c.from} {c.angry ? "😡" : `⭐${c.stars}`}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ol>
+          {result.hintUsers.length > 0 && (
+            <p className="hint hint-line">
+              💡 {t.hintUsers(result.hintUsers.join("، "), GAME_CONFIG.hintCost)}
+            </p>
+          )}
         </Panel>
       )}
 

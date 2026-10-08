@@ -1,3 +1,5 @@
+// LOCAL DEVELOPMENT ONLY (npm run dev). Same as wrangler.jsonc minus Workers AI,
+// which needs a Cloudflare login to run locally. The AI hint is disabled locally.
 // Cloudflare configuration for the Afsha game server.
 // Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
 {
@@ -6,9 +8,6 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-09-15",
   "observability": { "enabled": true },
-
-  // Workers AI (free plan: 10,000 Neurons/day) — used by the "Generate hint" button.
-  "ai": { "binding": "AI" },
 
   // One Durable Object per game room.
   "durable_objects": {

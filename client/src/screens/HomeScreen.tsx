@@ -2,15 +2,21 @@ import { GAME_CONFIG } from "@shared/config";
 import type { SessionResponse } from "@shared/protocol";
 import { normalizeDigits, textLength } from "@shared/text";
 import { useState, type FormEvent } from "react";
+import { Avatar } from "../components/Avatar";
+import { AvatarBuilder } from "../components/AvatarBuilder";
+import { DeveloperButton } from "../components/DeveloperCard";
+import { SoundControl } from "../components/SoundControl";
 import { Toast } from "../components/Toast";
 import { Button, Fringe, Logo } from "../components/ui";
 import { errorText, t } from "../i18n/ar";
 import { ApiFailure, createRoom, joinRoom } from "../lib/api";
 import { SERVER_URL } from "../lib/config";
-import { loadName, roomFromUrl, saveName } from "../lib/session";
+import { loadAvatar, loadName, roomFromUrl, saveAvatar, saveName } from "../lib/session";
 
 export function HomeScreen({ onEnter, notice }: { onEnter: (s: SessionResponse) => void; notice?: string | null }) {
   const [name, setName] = useState(loadName);
+  const [avatar, setAvatar] = useState(loadAvatar);
+  const [building, setBuilding] = useState(false);
   const [code, setCode] = useState(() => normalizeDigits(roomFromUrl()).replace(/\D/g, "").slice(0, 6));
   const [busy, setBusy] = useState<"host" | "join" | null>(null);
   const [error, setError] = useState<{ msg: string; at: number } | null>(
@@ -26,8 +32,9 @@ export function HomeScreen({ onEnter, notice }: { onEnter: (s: SessionResponse) 
     if (kind === "join" && code.length !== 6) return setError({ msg: errorText.INVALID_CODE, at: Date.now() });
     setBusy(kind);
     try {
-      const session = kind === "host" ? await createRoom(name.trim()) : await joinRoom(code, name.trim());
+      const session = kind === "host" ? await createRoom(name.trim(), avatar) : await joinRoom(code, name.trim(), avatar);
       saveName(name.trim());
+      saveAvatar(avatar);
       onEnter(session);
     } catch (err) {
       const c = err instanceof ApiFailure ? err.code : "NETWORK";
@@ -50,6 +57,11 @@ export function HomeScreen({ onEnter, notice }: { onEnter: (s: SessionResponse) 
         {!SERVER_URL && <div className="banner banner-static">{t.noServer}</div>}
 
         <form className="panel home-form" onSubmit={(e) => run(invited ? "join" : "host", e)}>
+          <div className="me-row">
+            <button type="button" className="avatar-edit" onClick={() => setBuilding(true)} aria-label={t.avatarTitle}>
+              <Avatar avatar={avatar} size={76} />
+              <span className="avatar-edit-label">✏️ {t.avatarEdit}</span>
+            </button>
           <label className="field">
             <span className="field-label">{t.yourName}</span>
             <input
@@ -63,6 +75,7 @@ export function HomeScreen({ onEnter, notice }: { onEnter: (s: SessionResponse) 
               dir="auto"
             />
           </label>
+          </div>
 
           {!invited && (
             <Button type="button" onClick={() => run("host")} busy={busy === "host"} disabled={busy !== null}>
@@ -105,6 +118,18 @@ export function HomeScreen({ onEnter, notice }: { onEnter: (s: SessionResponse) 
         <p className="facts">{t.facts}</p>
       </div>
       <Toast message={error?.msg ?? null} at={error?.at ?? 0} />
+      <SoundControl className="corner-sound" />
+      <DeveloperButton />
+      {building && (
+        <AvatarBuilder
+          value={avatar}
+          onDone={(a) => {
+            setAvatar(a);
+            saveAvatar(a);
+            setBuilding(false);
+          }}
+        />
+      )}
     </main>
   );
 }

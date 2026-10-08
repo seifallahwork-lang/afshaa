@@ -241,3 +241,21 @@ The folder must stay shared as **"Anyone with the link → Viewer"**.
 ## 10. Ideas already prepared for later
 
 Categories (data and settings already exist), host-chosen categories, more scoring rules, avatars, sound, emoji reactions, spectator mode, custom uploads, persistent stats. Each slots into a specific file listed above rather than requiring a rewrite.
+
+## 11. Game features (v2)
+
+| Feature | How it works | Where to change it |
+|---|---|---|
+| **Meme editor** | Text boxes you drag, stretch (side handle = wider, bottom handle = taller, corner = both), recolor (text + background), round corners, resize the font; quick emoji row; up to 6 boxes | `client/src/components/MemeEditor.tsx`, limits in `shared/design.ts` |
+| **Annotator** | ✏️ "رسم" mode: freehand pen, 6 colors, 3 widths, undo, clear | same files |
+| **No empty memes** | "ابعت الميم" stays disabled until there's text or a drawing; the server rejects empty memes too | `shared/design.ts` |
+| **Star voting** | Rate every other meme 1–5 ⭐ (+ optional comment), or 😡. Each ⭐ = +1 point, each 😡 = −2 points for the meme's author. Comments appear on the results with the voter's name | `shared/config.ts` → `angryPenalty`, `server/src/game/scoring.ts` |
+| **AI hint** | 💡 button during captioning: an AI looks at the image and gives a short Egyptian-Arabic nudge. Costs **10 points** (refunded automatically if the AI fails). Works only for Drive images | `shared/config.ts` → `hintCost`; prompt in `server/src/ai/hint.ts` |
+| **Avatars** | Build one on the home page: hairstyle (incl. hijab), hair color, skin, eye shape/color, mouth, beard, glasses, hat (incl. tarboosh), background, or 🎲 random | `client/src/components/Avatar.tsx` |
+| **Music & sounds** | Looping soundtrack (`client/public/audio/theme.mp3`), 🎵 button: on/off, volume, effects on/off (saved per device). "Beep–boop" ticks in the last 5 seconds, buzzer at 0 | `client/src/lib/sound.ts` |
+| **Meet the developer** | Button bottom-left on the home page and in the lobby | `client/src/config/developer.ts` (add your WhatsApp number there) |
+
+### AI hint setup
+Nothing to configure: `server/wrangler.jsonc` has `"ai": { "binding": "AI" }`, which uses **Cloudflare Workers AI** (model `@cf/google/gemma-4-26b-a4b-it`). It's included in the free Workers plan: 10,000 Neurons per day, and each hint costs only a small part of that. Hints are cached per meme, so the AI runs once per image.
+
+Locally (`npm run dev`) the server uses `server/wrangler.dev.jsonc`, which has no AI binding because Workers AI needs a Cloudflare login. The 💡 button is hidden in local testing and appears on the deployed site.

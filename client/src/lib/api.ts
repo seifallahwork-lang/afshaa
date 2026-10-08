@@ -1,3 +1,4 @@
+import type { Avatar } from "@shared/avatar";
 import type { ApiError, ErrorCode, SessionResponse } from "@shared/protocol";
 import { SERVER_URL } from "./config";
 
@@ -24,5 +25,5 @@ async function post(path: string, body: unknown): Promise<SessionResponse> {
   return data;
 }
 
-export const createRoom = (name: string) => post("/api/rooms", { name });
-export const joinRoom = (code: string, name: string) => post(`/api/rooms/${code}/join`, { name });
+export const createRoom = (name: string, avatar: Avatar) => post("/api/rooms", { name, avatar });
+export const joinRoom = (code: string, name: string, avatar: Avatar) => post(`/api/rooms/${code}/join`, { name, avatar });

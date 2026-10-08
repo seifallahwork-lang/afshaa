@@ -19,9 +19,12 @@ import {
   VOTING_SECONDS_OPTIONS,
   type GameSettings,
 } from "../../../shared/config";
+import { sanitizeAvatar } from "../../../shared/avatar";
+import { DesignError, sanitizeDesign } from "../../../shared/design";
 import { containsBlockedWord } from "../../../shared/moderation";
+import type { Rating } from "../../../shared/protocol";
 import { getActiveTemplates, type MemeTemplate } from "../../../shared/templates";
-import { cleanText, normalizeArabic, textLength } from "../../../shared/text";
+import { cleanText, normalizeArabic, textLength, truncate } from "../../../shared/text";
 import { GameError } from "./errors";
 import { randomHex, shuffle } from "./random";
 import { scoreRound } from "./scoring";
@@ -42,7 +45,7 @@ export const staticTemplates = (): MemeTemplate[] => getActiveTemplates();
 
 export function createRoomState(code: string, now: number): RoomState {
   return {
-    version: 2,
+    version: 3,
     code,
     createdAt: now,
     phase: "LOBBY",
@@ -56,7 +59,9 @@ export function createRoomState(code: string, now: number): RoomState {
     phaseEndsAt: null,
     submissions: [],
     revealOrder: [],
-    votes: {},
+    ratings: {},
+    hints: {},
+    hintCache: {},
     lastRound: null,
     highlights: [],
     emptySince: now,
@@ -79,7 +84,7 @@ export function validateName(raw: unknown): string {
 }
 
 /** Adds a player (the first one becomes host). Only allowed in the lobby. */
-export function addPlayer(s: RoomState, rawName: unknown, now: number): PlayerState {
+export function addPlayer(s: RoomState, rawName: unknown, now: number, rawAvatar?: unknown): PlayerState {
   if (s.phase !== "LOBBY") throw new GameError("GAME_STARTED");
   if (activePlayers(s).length >= GAME_CONFIG.maxPlayers) throw new GameError("ROOM_FULL");
   const name = validateName(rawName);
@@ -89,6 +94,7 @@ export function addPlayer(s: RoomState, rawName: unknown, now: number): PlayerSt
   const player: PlayerState = {
     id: randomHex(6),
     name,
+    avatar: sanitizeAvatar(rawAvatar),
     token: randomHex(24),
     joinedAt: now,
     // Not connected until the WebSocket arrives; removed after the lobby grace period if it never does.
@@ -232,7 +238,8 @@ function resetToLobby(s: RoomState): void {
   s.deck = [];
   s.submissions = [];
   s.revealOrder = [];
-  s.votes = {};
+  s.ratings = {};
+  s.hints = {};
   s.lastRound = null;
   s.highlights = [];
 }
@@ -241,44 +248,85 @@ function resetToLobby(s: RoomState): void {
 /* Player actions                                                      */
 /* ------------------------------------------------------------------ */
 
-export function submitCaption(
-  s: RoomState,
-  playerId: string,
-  raw: unknown,
-  now: number,
-): void {
+export function submitMeme(s: RoomState, playerId: string, raw: unknown, now: number): void {
   if (s.phase !== "CAPTION") throw new GameError("WRONG_PHASE");
   if (s.phaseEndsAt !== null && now >= s.phaseEndsAt) throw new GameError("WRONG_PHASE");
   const p = findPlayer(s, playerId);
   if (!p || p.left) throw new GameError("INVALID_TOKEN");
   if (s.submissions.some((x) => x.playerId === playerId)) throw new GameError("ALREADY_SUBMITTED");
-  if (typeof raw !== "string") throw new GameError("EMPTY_CAPTION");
-  const caption = cleanText(raw);
-  if (textLength(caption) === 0) throw new GameError("EMPTY_CAPTION");
-  if (textLength(caption) > GAME_CONFIG.captionMaxLength) throw new GameError("CAPTION_TOO_LONG");
-  if (containsBlockedWord(caption)) throw new GameError("BLOCKED_WORD");
-
-  s.submissions.push({ id: randomHex(5), playerId, caption, submittedAt: now });
+  let design;
+  try {
+    design = sanitizeDesign(raw);
+  } catch (e) {
+    throw new GameError(e instanceof DesignError ? e.code : "BAD_REQUEST");
+  }
+  s.submissions.push({ id: randomHex(5), playerId, design, submittedAt: now });
   advanceIfEveryoneDone(s, now);
 }
 
-export function castVote(
+/** Rate one meme: 1–5 stars or 😡, optional comment. Final once sent. */
+export function rate(
   s: RoomState,
   playerId: string,
-  submissionId: unknown,
+  msg: { submissionId?: unknown; stars?: unknown; angry?: unknown; comment?: unknown },
   now: number,
 ): void {
   if (s.phase !== "VOTING") throw new GameError("WRONG_PHASE");
   if (s.phaseEndsAt !== null && now >= s.phaseEndsAt) throw new GameError("WRONG_PHASE");
   const p = findPlayer(s, playerId);
   if (!p || p.left) throw new GameError("INVALID_TOKEN");
-  if (s.votes[playerId]) throw new GameError("ALREADY_VOTED");
-  const sub = s.submissions.find((x) => x.id === submissionId);
+  const sub = s.submissions.find((x) => x.id === msg.submissionId);
   if (!sub) throw new GameError("INVALID_VOTE");
   if (sub.playerId === playerId) throw new GameError("CANNOT_VOTE_SELF");
+  if (s.ratings[playerId]?.[sub.id]) throw new GameError("ALREADY_VOTED");
 
-  s.votes[playerId] = sub.id;
+  const angry = msg.angry === true;
+  const stars = angry ? 0 : msg.stars;
+  if (!angry && !(Number.isInteger(stars) && (stars as number) >= 1 && (stars as number) <= 5))
+    throw new GameError("INVALID_VOTE");
+  const comment = typeof msg.comment === "string" ? truncate(cleanText(msg.comment), GAME_CONFIG.commentMaxLength) : "";
+  if (comment && containsBlockedWord(comment)) throw new GameError("BLOCKED_WORD");
+
+  const rating: Rating = { stars: stars as number, angry, comment };
+  s.ratings[playerId] = { ...(s.ratings[playerId] ?? {}), [sub.id]: rating };
   advanceIfEveryoneDone(s, now);
+}
+
+/** Has this player rated every meme that isn't theirs? */
+export function isDoneVoting(s: RoomState, playerId: string): boolean {
+  const mine = s.ratings[playerId] ?? {};
+  return s.submissions.every((x) => x.playerId === playerId || mine[x.id]);
+}
+
+/* ---------- AI hint (the Durable Object calls the AI between these two) ---------- */
+
+/** Charge the hint cost and mark it pending. Returns the cached hint text if there is one. */
+export function requestHint(s: RoomState, playerId: string, now: number): string | null {
+  if (s.phase !== "CAPTION" || (s.phaseEndsAt !== null && now >= s.phaseEndsAt)) throw new GameError("WRONG_PHASE");
+  const p = findPlayer(s, playerId);
+  if (!p || p.left) throw new GameError("INVALID_TOKEN");
+  if (s.hints[playerId]) throw new GameError("HINT_USED");
+  if (s.submissions.some((x) => x.playerId === playerId)) throw new GameError("ALREADY_SUBMITTED");
+  p.score -= GAME_CONFIG.hintCost;
+  const cached = s.currentTemplate ? s.hintCache[s.currentTemplate.id] : undefined;
+  s.hints[playerId] = { text: cached ?? null };
+  return cached ?? null;
+}
+
+/** Store the AI's answer (only if the same round is still running). */
+export function resolveHint(s: RoomState, playerId: string, round: number, templateId: string, text: string): void {
+  s.hintCache[templateId] = text;
+  if (s.round !== round || s.currentTemplate?.id !== templateId) return;
+  const h = s.hints[playerId];
+  if (h && h.text === null) h.text = text;
+}
+
+/** The AI failed: give the points back so the player can try again. */
+export function refundHint(s: RoomState, playerId: string, round: number): void {
+  if (s.round !== round || !s.hints[playerId] || s.hints[playerId].text !== null) return;
+  delete s.hints[playerId];
+  const p = findPlayer(s, playerId);
+  if (p) p.score += GAME_CONFIG.hintCost;
 }
 
 /* ------------------------------------------------------------------ */
@@ -307,7 +355,8 @@ function beginRound(s: RoomState, now: number): void {
   s.currentTemplate = s.deck[s.round - 1] ?? s.deck[0] ?? null;
   s.submissions = [];
   s.revealOrder = [];
-  s.votes = {};
+  s.ratings = {};
+  s.hints = {};
   setPhase(s, "COUNTDOWN", now + GAME_CONFIG.countdownSeconds * S);
 }
 
@@ -321,17 +370,18 @@ function closeCaptions(s: RoomState, now: number): void {
 }
 
 function finishRound(s: RoomState, now: number): void {
-  const { entries, winnerIds } = scoreRound(s.submissions, s.votes, s.players);
+  const { entries, winnerIds } = scoreRound(s.submissions, s.ratings, s.players);
   for (const e of entries) {
     const p = findPlayer(s, e.playerId);
     if (p) p.score += e.points;
   }
   const template = s.currentTemplate;
   if (template) {
-    s.lastRound = { round: s.round, template, entries, winnerIds };
+    const hintUsers = Object.keys(s.hints).map((id) => findPlayer(s, id)?.name ?? "؟");
+    s.lastRound = { round: s.round, template, entries, winnerIds, hintUsers };
     const best = entries[0];
-    if (best && best.votes > 0) {
-      s.highlights.push({ round: s.round, template, caption: best.caption, playerName: best.playerName, votes: best.votes });
+    if (best && best.points > 0) {
+      s.highlights.push({ round: s.round, template, design: best.design, playerName: best.playerName, points: best.points });
     }
   }
   setPhase(s, "ROUND_RESULTS", now + GAME_CONFIG.roundResultsSeconds * S);
@@ -354,7 +404,7 @@ export function advanceIfEveryoneDone(s: RoomState, now: number): void {
   if (s.phase === "CAPTION") {
     if (connected.every((p) => s.submissions.some((x) => x.playerId === p.id))) closeCaptions(s, now);
   } else if (s.phase === "VOTING") {
-    if (eligibleVoters(s).every((p) => s.votes[p.id])) finishRound(s, now);
+    if (eligibleVoters(s).every((p) => isDoneVoting(s, p.id))) finishRound(s, now);
   }
 }
 

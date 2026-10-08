@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { GAME_CONFIG } from "../../shared/config";
 import {
   addPlayer,
-  castVote,
+  rate,
+  refundHint,
+  requestHint,
+  resolveHint,
   createRoomState,
   leave,
   markConnected,
@@ -10,13 +13,19 @@ import {
   playAgain,
   returnToLobby,
   startGame,
-  submitCaption,
+  submitMeme,
   tick,
   updateSettings,
 } from "../src/game/engine";
 import { GameError } from "../src/game/errors";
 import type { RoomState } from "../src/game/types";
 import { buildView } from "../src/game/view";
+
+/** A simple one-text-box meme. */
+const cap = (text: string) => ({ boxes: [{ id: "a", text, x: 5, y: 70, w: 90, h: 25, color: "#FFFFFF", bg: "transparent", rounded: false, size: 7 }], strokes: [] });
+/** Vote helper: stars by default, "angry" for 😡. */
+const vote = (s: RoomState, voter: string, submissionId: string, t: number, how: number | "angry" = 3) =>
+  rate(s, voter, how === "angry" ? { submissionId, angry: true } : { submissionId, stars: how }, t);
 
 const S = 1000;
 const T0 = 1_700_000_000_000;
@@ -112,44 +121,44 @@ describe("captions", () => {
     const { s, ids } = room(3);
     startGame(s, ids[0], T0);
     const t = toCaption(s);
-    submitCaption(s, ids[0], "لما الامتحان يطلع سهل 😂", t);
+    submitMeme(s, ids[0], cap("لما الامتحان يطلع سهل 😂"), t);
     const v = buildView(s, ids[1]);
     expect(v.submissions).toBeNull();
     expect(JSON.stringify(v)).not.toContain("الامتحان");
     expect(v.players.find((p) => p.id === ids[0])!.hasSubmitted).toBe(true);
-    expect(buildView(s, ids[0]).you.myCaption).toContain("الامتحان");
+    expect(JSON.stringify(buildView(s, ids[0]).you.myDesign)).toContain("الامتحان");
   });
 
   it("prevents duplicate, empty and too-long submissions", () => {
     const { s, ids } = room(3);
     startGame(s, ids[0], T0);
     const t = toCaption(s);
-    expectError(() => submitCaption(s, ids[0], "   ", t), "EMPTY_CAPTION");
-    expectError(() => submitCaption(s, ids[0], "ا".repeat(GAME_CONFIG.captionMaxLength + 1), t), "CAPTION_TOO_LONG");
-    submitCaption(s, ids[0], "أول كابشن", t);
-    expectError(() => submitCaption(s, ids[0], "تاني", t), "ALREADY_SUBMITTED");
+    expectError(() => submitMeme(s, ids[0], cap("   "), t), "EMPTY_CAPTION");
+    expectError(() => submitMeme(s, ids[0], cap("ا".repeat(GAME_CONFIG.captionMaxLength + 1)), t), "CAPTION_TOO_LONG");
+    submitMeme(s, ids[0], cap("أول كابشن"), t);
+    expectError(() => submitMeme(s, ids[0], cap("تاني"), t), "ALREADY_SUBMITTED");
   });
 
   it("counts emoji and Arabic as single characters", () => {
     const { s, ids } = room(2);
     startGame(s, ids[0], T0);
     const t = toCaption(s);
-    submitCaption(s, ids[0], "😂".repeat(GAME_CONFIG.captionMaxLength), t);
+    submitMeme(s, ids[0], cap("😂".repeat(GAME_CONFIG.captionMaxLength)), t);
   });
 
   it("rejects captions in the wrong phase or after the timer", () => {
     const { s, ids } = room(2);
-    expectError(() => submitCaption(s, ids[0], "مبكر", T0), "WRONG_PHASE");
+    expectError(() => submitMeme(s, ids[0], cap("مبكر"), T0), "WRONG_PHASE");
     startGame(s, ids[0], T0);
     toCaption(s);
-    expectError(() => submitCaption(s, ids[0], "متأخر", s.phaseEndsAt!), "WRONG_PHASE");
+    expectError(() => submitMeme(s, ids[0], cap("متأخر"), s.phaseEndsAt!), "WRONG_PHASE");
   });
 
   it("moves to the reveal when everyone submitted", () => {
     const { s, ids } = room(3);
     startGame(s, ids[0], T0);
     const t = toCaption(s);
-    ids.forEach((id, i) => submitCaption(s, id, `كابشن ${i}`, t));
+    ids.forEach((id, i) => submitMeme(s, id, cap(`كابشن ${i}`), t));
     expect(s.phase).toBe("REVEAL");
     const v = buildView(s, ids[1]);
     expect(v.submissions!.length).toBe(3);
@@ -160,7 +169,7 @@ describe("captions", () => {
     const { s, ids } = room(3);
     startGame(s, ids[0], T0);
     const t = toCaption(s);
-    submitCaption(s, ids[0], "لوحدي", t);
+    submitMeme(s, ids[0], cap("لوحدي"), t);
     expire(s);
     expect(s.phase).toBe("REVEAL");
   });
@@ -178,60 +187,115 @@ function toVoting(n: number) {
   const { s, ids } = room(n);
   startGame(s, ids[0], T0);
   const t = toCaption(s);
-  ids.forEach((id, i) => submitCaption(s, id, `كابشن ${i}`, t));
+  ids.forEach((id, i) => submitMeme(s, id, cap(`كابشن ${i}`), t));
   const tv = expire(s); // REVEAL -> VOTING
   const subOf = (id: string) => s.submissions.find((x) => x.playerId === id)!.id;
   return { s, ids, tv, subOf };
 }
 
-describe("voting & scoring", () => {
-  it("cannot vote for own meme, cannot vote twice", () => {
+describe("voting & scoring (stars, 😡, comments)", () => {
+  it("cannot rate own meme, cannot rate the same meme twice, can rate several memes", () => {
     const { s, ids, tv, subOf } = toVoting(3);
     expect(s.phase).toBe("VOTING");
-    expectError(() => castVote(s, ids[0], subOf(ids[0]), tv), "CANNOT_VOTE_SELF");
-    castVote(s, ids[0], subOf(ids[1]), tv);
-    expectError(() => castVote(s, ids[0], subOf(ids[2]), tv), "ALREADY_VOTED");
-    expectError(() => castVote(s, ids[1], "nope", tv), "INVALID_VOTE");
+    expectError(() => vote(s, ids[0], subOf(ids[0]), tv), "CANNOT_VOTE_SELF");
+    vote(s, ids[0], subOf(ids[1]), tv, 5);
+    expectError(() => vote(s, ids[0], subOf(ids[1]), tv, 1), "ALREADY_VOTED");
+    vote(s, ids[0], subOf(ids[2]), tv, 2); // a different meme is fine
+    expectError(() => vote(s, ids[1], "nope", tv), "INVALID_VOTE");
+    expectError(() => rate(s, ids[1], { submissionId: subOf(ids[0]), stars: 6 }, tv), "INVALID_VOTE");
+    expectError(() => rate(s, ids[1], { submissionId: subOf(ids[0]) }, tv), "INVALID_VOTE");
   });
 
-  it("scores 1 point per vote and ends early when all voted", () => {
+  it("stars add points, 😡 subtracts, comments are kept; ends early when everyone rated everything", () => {
     const { s, ids, tv, subOf } = toVoting(3);
-    castVote(s, ids[0], subOf(ids[1]), tv);
-    castVote(s, ids[2], subOf(ids[1]), tv);
-    castVote(s, ids[1], subOf(ids[0]), tv);
+    // p1's meme: 5★ + 4★ = 9.  p0's meme: 3★ + 😡 = 3 - 2 = 1.  p2's meme: 😡 + 1★ = -2 + 1 = -1
+    rate(s, ids[0], { submissionId: subOf(ids[1]), stars: 5, comment: "هههه جامد 😂" }, tv);
+    vote(s, ids[0], subOf(ids[2]), tv, "angry");
+    vote(s, ids[2], subOf(ids[1]), tv, 4);
+    vote(s, ids[2], subOf(ids[0]), tv, "angry");
+    vote(s, ids[1], subOf(ids[0]), tv, 3);
+    expect(s.phase).toBe("VOTING"); // p1 still has one meme to rate
+    vote(s, ids[1], subOf(ids[2]), tv, 1);
     expect(s.phase).toBe("ROUND_RESULTS");
-    expect(s.players.find((p) => p.id === ids[1])!.score).toBe(2);
-    expect(s.players.find((p) => p.id === ids[0])!.score).toBe(1);
+    const score = (i: number) => s.players.find((p) => p.id === ids[i])!.score;
+    expect(score(1)).toBe(9);
+    expect(score(0)).toBe(3 - GAME_CONFIG.angryPenalty);
+    expect(score(2)).toBe(1 - GAME_CONFIG.angryPenalty);
     expect(s.lastRound!.winnerIds).toEqual([ids[1]]);
-    expect(buildView(s, ids[2]).lastRound!.entries[0].playerName).toBe("لاعب 2");
+    const top = buildView(s, ids[2]).lastRound!.entries[0];
+    expect(top.playerName).toBe("لاعب 2");
+    expect(top.comments[0]).toMatchObject({ from: "لاعب 1", text: "هههه جامد 😂", stars: 5 });
   });
 
   it("voting timer expiry calculates results", () => {
     const { s, ids, tv, subOf } = toVoting(3);
-    castVote(s, ids[0], subOf(ids[1]), tv);
+    vote(s, ids[0], subOf(ids[1]), tv, 4);
     expire(s);
     expect(s.phase).toBe("ROUND_RESULTS");
-    expect(s.players.find((p) => p.id === ids[1])!.score).toBe(1);
+    expect(s.players.find((p) => p.id === ids[1])!.score).toBe(4);
   });
 
   it("a disconnect during voting doesn't block the round", () => {
     const { s, ids, tv, subOf } = toVoting(3);
-    castVote(s, ids[0], subOf(ids[1]), tv);
-    castVote(s, ids[1], subOf(ids[0]), tv);
+    for (const v of [0, 1]) for (const target of [0, 1, 2]) if (v !== target) vote(s, ids[v], subOf(ids[target]), tv);
     markDisconnected(s, ids[2], tv);
     expect(s.phase).toBe("ROUND_RESULTS");
+  });
+});
+
+describe("meme designs", () => {
+  it("rejects an empty meme but accepts a drawing-only meme", () => {
+    const { s, ids } = room(2);
+    startGame(s, ids[0], T0);
+    const t = toCaption(s);
+    expectError(() => submitMeme(s, ids[0], { boxes: [], strokes: [] }, t), "EMPTY_CAPTION");
+    expectError(() => submitMeme(s, ids[0], { boxes: [{ text: "   " }], strokes: [] }, t), "EMPTY_CAPTION");
+    submitMeme(s, ids[0], { boxes: [], strokes: [{ color: "#E63946", width: 2, points: [10, 10, 500, 500] }] }, t);
+  });
+
+  it("clamps positions and rejects unknown colors", () => {
+    const { s, ids } = room(2);
+    startGame(s, ids[0], T0);
+    const t = toCaption(s);
+    submitMeme(s, ids[0], { boxes: [{ text: "x", x: 95, y: -5, w: 50, h: 300, color: "red;}", bg: "url(x)", size: 99 }], strokes: [] }, t);
+    const b = s.submissions[0].design.boxes[0];
+    expect(b.x + b.w).toBeLessThanOrEqual(100);
+    expect(b.y).toBeGreaterThanOrEqual(0);
+    expect(b.h).toBe(100);
+    expect(b.color).toBe("#FFFFFF");
+    expect(b.bg).toBe("transparent");
+    expect(b.size).toBe(14);
+  });
+});
+
+describe("AI hint", () => {
+  it("costs points once per round, can be refunded, and is cached per meme", () => {
+    const { s, ids } = room(2);
+    startGame(s, ids[0], T0);
+    const t = toCaption(s);
+    const tpl = s.currentTemplate!.id;
+    expect(requestHint(s, ids[0], t)).toBeNull();
+    expect(s.players[0].score).toBe(-GAME_CONFIG.hintCost);
+    expectError(() => requestHint(s, ids[0], t), "HINT_USED");
+    refundHint(s, ids[0], s.round);
+    expect(s.players[0].score).toBe(0);
+    requestHint(s, ids[0], t);
+    resolveHint(s, ids[0], s.round, tpl, "بص على وشه 😂");
+    expect(buildView(s, ids[0]).you.hint).toEqual({ status: "ready", text: "بص على وشه 😂" });
+    expect(buildView(s, ids[1]).you.hint).toBeNull(); // private
+    expect(requestHint(s, ids[1], t)).toBe("بص على وشه 😂"); // cached: no second AI call
+    expect(s.players[1].score).toBe(-GAME_CONFIG.hintCost);
   });
 });
 
 describe("game flow", () => {
   function playRound(s: RoomState, ids: string[]) {
     const t = toCaption(s);
-    ids.forEach((id, i) => submitCaption(s, id, `ر${s.round} ل${i}`, t));
+    ids.forEach((id, i) => submitMeme(s, id, cap(`ر${s.round} ل${i}`), t));
     const tv = expire(s);
     const subs = s.submissions;
     ids.forEach((id, i) => {
-      const target = subs.find((x) => x.playerId === ids[(i + 1) % ids.length])!;
-      castVote(s, id, target.id, tv);
+      for (const target of subs) if (target.playerId !== id) vote(s, id, target.id, tv, target.playerId === ids[(i + 1) % ids.length] ? 3 : 1);
     });
     expect(s.phase).toBe("ROUND_RESULTS");
     expire(s);
@@ -248,7 +312,8 @@ describe("game flow", () => {
     }
     expect(s.phase).toBe("FINAL_RESULTS");
     expect(seen.size).toBe(3);
-    expect(s.players.reduce((a, p) => a + p.score, 0)).toBe(9);
+    // each round: every player gives one 3★ and one 1★ → 3 players × 4 = 12 points per round
+    expect(s.players.reduce((a, p) => a + p.score, 0)).toBe(36);
   });
 
   it("play again keeps players and resets scores; return to lobby works", () => {

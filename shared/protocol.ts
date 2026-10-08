@@ -2,7 +2,9 @@
  * Everything that travels between the browser and the game server.
  * Both sides import these types, so a change here is checked everywhere.
  */
+import type { Avatar } from "./avatar";
 import type { GameSettings } from "./config";
+import type { MemeDesign } from "./design";
 import type { MemeTemplate } from "./templates";
 
 export type Phase =
@@ -33,6 +35,9 @@ export type ErrorCode =
   | "INVALID_VOTE"
   | "INVALID_SETTINGS"
   | "INVALID_TOKEN"
+  | "HINT_USED"
+  | "HINT_UNAVAILABLE"
+  | "HINT_FAILED"
   | "BAD_REQUEST"
   | "CODE_IN_USE"
   | "SERVER_ERROR";
@@ -41,6 +46,7 @@ export type ErrorCode =
 
 export interface CreateRoomRequest {
   name: string;
+  avatar: Avatar;
 }
 export interface SessionResponse {
   code: string;
@@ -51,13 +57,23 @@ export interface ApiError {
   error: ErrorCode;
 }
 
+/* ---------- Voting ---------- */
+
+/** One player's verdict on one meme: 1–5 stars, or 😡 (angry). Comment optional. */
+export interface Rating {
+  stars: number; // 0 when angry
+  angry: boolean;
+  comment: string;
+}
+
 /* ---------- WebSocket: client -> server ---------- */
 
 export type ClientMessage =
   | { type: "start" }
   | { type: "updateSettings"; settings: Partial<GameSettings> }
-  | { type: "submitCaption"; caption: string }
-  | { type: "vote"; submissionId: string }
+  | { type: "submitMeme"; design: MemeDesign }
+  | { type: "rate"; submissionId: string; stars?: number; angry?: boolean; comment?: string }
+  | { type: "requestHint" }
   | { type: "skip" } // host: skip the round-results wait
   | { type: "playAgain" } // host: same players, new game
   | { type: "returnToLobby" } // host
@@ -82,26 +98,39 @@ export const CLOSE_CODES = {
 export interface PlayerView {
   id: string;
   name: string;
+  avatar: Avatar;
   isHost: boolean;
   connected: boolean;
   left: boolean;
   score: number;
-  /** Only "has / hasn't" — never the caption itself before the reveal. */
+  /** Only "has / hasn't" — never the meme itself before the reveal. */
   hasSubmitted: boolean;
-  hasVoted: boolean;
+  /** Has rated every meme they're allowed to rate. */
+  doneVoting: boolean;
 }
 
 export interface SubmissionView {
   id: string;
-  caption: string;
+  design: MemeDesign;
+}
+
+export interface RoundComment {
+  from: string;
+  text: string;
+  stars: number;
+  angry: boolean;
 }
 
 export interface RoundEntry {
   submissionId: string;
   playerId: string;
   playerName: string;
-  caption: string;
-  votes: number;
+  avatar: Avatar;
+  design: MemeDesign;
+  stars: number; // total stars received
+  raters: number; // how many people gave stars
+  angry: number; // how many 😡
+  comments: RoundComment[];
   points: number;
   /** Human-readable breakdown, ready for future bonus rules. */
   awards: { rule: string; points: number }[];
@@ -112,14 +141,16 @@ export interface RoundResult {
   template: MemeTemplate;
   entries: RoundEntry[]; // sorted, best first
   winnerIds: string[];
+  /** Names of players who paid for an AI hint this round. */
+  hintUsers: string[];
 }
 
 export interface Highlight {
   round: number;
   template: MemeTemplate;
-  caption: string;
+  design: MemeDesign;
   playerName: string;
-  votes: number;
+  points: number;
 }
 
 export interface RoomView {
@@ -138,11 +169,15 @@ export interface RoomView {
   preloadImage: string | null;
   lastRound: RoundResult | null;
   highlights: Highlight[];
+  /** Is the AI hint available on this server? */
+  hintsEnabled: boolean;
   you: {
     id: string;
     isHost: boolean;
-    myCaption: string | null;
+    myDesign: MemeDesign | null;
     mySubmissionId: string | null;
-    votedFor: string | null;
+    /** submissionId -> my rating */
+    myRatings: Record<string, Rating>;
+    hint: { status: "pending" | "ready"; text: string | null } | null;
   };
 }

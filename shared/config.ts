@@ -27,11 +27,18 @@ export const GAME_CONFIG = {
   emptyRoomTtlSeconds: 10 * 60,
   /** Hard limit on a room's lifetime. */
   maxRoomLifetimeSeconds: 3 * 60 * 60,
+
+  /** Points taken away for each "Generate hint" (AI). */
+  hintCost: 10,
+  /** Points taken away for each 😡 a meme receives. */
+  angryPenalty: 2,
+  /** Max length of a voting comment. */
+  commentMaxLength: 80,
 } as const;
 
 export const ROUND_OPTIONS = [3, 5, 7, 10] as const;
 export const CAPTION_SECONDS_OPTIONS = [30, 60, 90, 120, 180] as const;
-export const VOTING_SECONDS_OPTIONS = [15, 20, 30, 45, 60] as const;
+export const VOTING_SECONDS_OPTIONS = [20, 30, 45, 60, 90] as const;
 
 export interface GameSettings {
   rounds: number;
@@ -44,6 +51,6 @@ export interface GameSettings {
 export const DEFAULT_SETTINGS: GameSettings = {
   rounds: 3,
   captionSeconds: 90,
-  votingSeconds: 30,
+  votingSeconds: 45, // rating every meme with stars takes a bit longer
   categories: null,
 };
