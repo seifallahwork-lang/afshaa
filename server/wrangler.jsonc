@@ -2,7 +2,7 @@
 // Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-     "name": "afshaa",
+  "name": "afshaa",
   "main": "src/index.ts",
   "compatibility_date": "2025-09-15",
   "observability": { "enabled": true },
@@ -17,6 +17,9 @@
   "vars": {
     // Which websites may talk to this server. After your first Vercel deploy,
     // change this to your site, e.g. "https://afsha.vercel.app" (comma-separate several).
-    "ALLOWED_ORIGINS": "*"
+    "ALLOWED_ORIGINS": "*",
+    // Google Drive folder that holds the meme images (shared as "Anyone with the link").
+    // The API key is NOT here: add it in Cloudflare as a secret named GOOGLE_API_KEY.
+    "DRIVE_FOLDER_ID": "1IFlNv8pigQ6cqRXfIeUT06edaT4GlZDy"
   }
 }

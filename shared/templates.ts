@@ -30,7 +30,8 @@ export interface MemeTemplate {
   /** Path under client/public (e.g. "/templates/egypt_001.jpg") or a full https:// URL. */
   image: string;
   name: string;
-  categories: TemplateCategory[];
+  /** Known categories are listed above; Drive sub-folder names are also allowed. */
+  categories: (TemplateCategory | string)[];
   /** Where the caption is drawn on the image. Default "bottom". */
   captionPosition?: "top" | "bottom";
   /** Set to false to hide a template without deleting it. Default true. */

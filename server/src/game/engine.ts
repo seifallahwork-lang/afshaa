@@ -29,11 +29,12 @@ import type { PlayerState, RoomState } from "./types";
 
 const S = 1000;
 
-/** Where templates come from. Swap this for a DB/bucket source later. */
-export interface TemplateSource {
-  list(categories: string[] | null): MemeTemplate[];
-}
-export const staticTemplates: TemplateSource = { list: getActiveTemplates };
+/**
+ * Templates are passed in when a game starts (the Durable Object loads them
+ * from Google Drive, or from shared/templates.json as a fallback). The game
+ * keeps its own copy of the memes it will use, so nothing changes mid-game.
+ */
+export const staticTemplates = (): MemeTemplate[] => getActiveTemplates();
 
 /* ------------------------------------------------------------------ */
 /* Room & players                                                      */
@@ -41,7 +42,7 @@ export const staticTemplates: TemplateSource = { list: getActiveTemplates };
 
 export function createRoomState(code: string, now: number): RoomState {
   return {
-    version: 1,
+    version: 2,
     code,
     createdAt: now,
     phase: "LOBBY",
@@ -50,8 +51,8 @@ export function createRoomState(code: string, now: number): RoomState {
     players: [],
     gameNumber: 0,
     round: 0,
-    templateDeck: [],
-    currentTemplateId: null,
+    deck: [],
+    currentTemplate: null,
     phaseEndsAt: null,
     submissions: [],
     revealOrder: [],
@@ -111,17 +112,17 @@ export function markConnected(s: RoomState, playerId: string, now: number): void
   tick(s, now);
 }
 
-export function markDisconnected(s: RoomState, playerId: string, now: number, templates = staticTemplates): void {
+export function markDisconnected(s: RoomState, playerId: string, now: number): void {
   const p = findPlayer(s, playerId);
   if (!p || !p.connected) return;
   p.connected = false;
   p.disconnectedAt = now;
-  advanceIfEveryoneDone(s, now, templates);
-  tick(s, now, templates);
+  advanceIfEveryoneDone(s, now);
+  tick(s, now);
 }
 
 /** Player pressed "leave". In the lobby they vanish; mid-game they stay on the scoreboard. */
-export function leave(s: RoomState, playerId: string, now: number, templates = staticTemplates): void {
+export function leave(s: RoomState, playerId: string, now: number): void {
   const p = findPlayer(s, playerId);
   if (!p) return;
   if (s.phase === "LOBBY") {
@@ -132,8 +133,8 @@ export function leave(s: RoomState, playerId: string, now: number, templates = s
     p.disconnectedAt = now;
   }
   if (s.hostId === playerId) migrateHost(s);
-  advanceIfEveryoneDone(s, now, templates);
-  tick(s, now, templates);
+  advanceIfEveryoneDone(s, now);
+  tick(s, now);
 }
 
 function migrateHost(s: RoomState): void {
@@ -176,7 +177,12 @@ export function updateSettings(s: RoomState, playerId: string, patch: Partial<Ga
   s.settings = next;
 }
 
-export function startGame(s: RoomState, playerId: string, now: number, templates = staticTemplates): void {
+export function startGame(
+  s: RoomState,
+  playerId: string,
+  now: number,
+  templates: MemeTemplate[] = staticTemplates(),
+): void {
   requireHost(s, playerId);
   if (s.phase !== "LOBBY") throw new GameError("WRONG_PHASE");
   if (connectedPlayers(s).length < GAME_CONFIG.minPlayers) throw new GameError("NOT_ENOUGH_PLAYERS");
@@ -187,18 +193,23 @@ export function startGame(s: RoomState, playerId: string, now: number, templates
   s.round = 0;
   s.lastRound = null;
   s.highlights = [];
-  s.templateDeck = [];
-  beginRound(s, now, templates);
+  s.deck = buildDeck(templates, s.settings.rounds);
+  beginRound(s, now);
 }
 
 /** Host skips the wait on the round-results screen. */
-export function skip(s: RoomState, playerId: string, now: number, templates = staticTemplates): void {
+export function skip(s: RoomState, playerId: string, now: number): void {
   requireHost(s, playerId);
   if (s.phase !== "ROUND_RESULTS") throw new GameError("WRONG_PHASE");
-  endRoundResults(s, now, templates);
+  endRoundResults(s, now);
 }
 
-export function playAgain(s: RoomState, playerId: string, now: number, templates = staticTemplates): void {
+export function playAgain(
+  s: RoomState,
+  playerId: string,
+  now: number,
+  templates: MemeTemplate[] = staticTemplates(),
+): void {
   requireHost(s, playerId);
   if (s.phase !== "FINAL_RESULTS") throw new GameError("WRONG_PHASE");
   resetToLobby(s);
@@ -217,7 +228,8 @@ function resetToLobby(s: RoomState): void {
   s.phase = "LOBBY";
   s.phaseEndsAt = null;
   s.round = 0;
-  s.currentTemplateId = null;
+  s.currentTemplate = null;
+  s.deck = [];
   s.submissions = [];
   s.revealOrder = [];
   s.votes = {};
@@ -234,7 +246,6 @@ export function submitCaption(
   playerId: string,
   raw: unknown,
   now: number,
-  templates = staticTemplates,
 ): void {
   if (s.phase !== "CAPTION") throw new GameError("WRONG_PHASE");
   if (s.phaseEndsAt !== null && now >= s.phaseEndsAt) throw new GameError("WRONG_PHASE");
@@ -248,7 +259,7 @@ export function submitCaption(
   if (containsBlockedWord(caption)) throw new GameError("BLOCKED_WORD");
 
   s.submissions.push({ id: randomHex(5), playerId, caption, submittedAt: now });
-  advanceIfEveryoneDone(s, now, templates);
+  advanceIfEveryoneDone(s, now);
 }
 
 export function castVote(
@@ -256,7 +267,6 @@ export function castVote(
   playerId: string,
   submissionId: unknown,
   now: number,
-  templates = staticTemplates,
 ): void {
   if (s.phase !== "VOTING") throw new GameError("WRONG_PHASE");
   if (s.phaseEndsAt !== null && now >= s.phaseEndsAt) throw new GameError("WRONG_PHASE");
@@ -268,7 +278,7 @@ export function castVote(
   if (sub.playerId === playerId) throw new GameError("CANNOT_VOTE_SELF");
 
   s.votes[playerId] = sub.id;
-  advanceIfEveryoneDone(s, now, templates);
+  advanceIfEveryoneDone(s, now);
 }
 
 /* ------------------------------------------------------------------ */
@@ -280,42 +290,43 @@ function setPhase(s: RoomState, phase: RoomState["phase"], endsAt: number | null
   s.phaseEndsAt = endsAt;
 }
 
-function drawTemplate(s: RoomState, templates: TemplateSource): string | null {
-  if (s.templateDeck.length === 0) {
-    const ids = templates.list(s.settings.categories).map((t) => t.id);
-    let deck = shuffle(ids);
-    // Avoid showing the same meme twice in a row when the deck refills.
-    if (deck.length > 1 && deck[deck.length - 1] === s.currentTemplateId) deck = [...deck.slice(-1), ...deck.slice(0, -1)];
-    s.templateDeck = deck;
+/** Pick this game's memes up front: random, no repeats until the pool runs out. */
+function buildDeck(templates: MemeTemplate[], rounds: number): MemeTemplate[] {
+  if (templates.length === 0) return [];
+  const deck: MemeTemplate[] = [];
+  while (deck.length < rounds) {
+    let batch = shuffle(templates);
+    if (batch.length > 1 && batch[0].id === deck[deck.length - 1]?.id) batch = [...batch.slice(1), batch[0]];
+    deck.push(...batch);
   }
-  return s.templateDeck.pop() ?? null;
+  return deck.slice(0, rounds);
 }
 
-function beginRound(s: RoomState, now: number, templates: TemplateSource): void {
+function beginRound(s: RoomState, now: number): void {
   s.round += 1;
-  s.currentTemplateId = drawTemplate(s, templates);
+  s.currentTemplate = s.deck[s.round - 1] ?? s.deck[0] ?? null;
   s.submissions = [];
   s.revealOrder = [];
   s.votes = {};
   setPhase(s, "COUNTDOWN", now + GAME_CONFIG.countdownSeconds * S);
 }
 
-function closeCaptions(s: RoomState, now: number, templates: TemplateSource): void {
+function closeCaptions(s: RoomState, now: number): void {
   if (s.submissions.length === 0) {
-    finishRound(s, now, templates);
+    finishRound(s, now);
     return;
   }
   s.revealOrder = shuffle(s.submissions.map((x) => x.id));
   setPhase(s, "REVEAL", now + GAME_CONFIG.revealSeconds * S);
 }
 
-function finishRound(s: RoomState, now: number, templates: TemplateSource): void {
+function finishRound(s: RoomState, now: number): void {
   const { entries, winnerIds } = scoreRound(s.submissions, s.votes, s.players);
   for (const e of entries) {
     const p = findPlayer(s, e.playerId);
     if (p) p.score += e.points;
   }
-  const template = templates.list(null).find((t) => t.id === s.currentTemplateId) ?? null;
+  const template = s.currentTemplate;
   if (template) {
     s.lastRound = { round: s.round, template, entries, winnerIds };
     const best = entries[0];
@@ -326,9 +337,9 @@ function finishRound(s: RoomState, now: number, templates: TemplateSource): void
   setPhase(s, "ROUND_RESULTS", now + GAME_CONFIG.roundResultsSeconds * S);
 }
 
-function endRoundResults(s: RoomState, now: number, templates: TemplateSource): void {
+function endRoundResults(s: RoomState, now: number): void {
   if (s.round >= s.settings.rounds) setPhase(s, "FINAL_RESULTS", null);
-  else beginRound(s, now, templates);
+  else beginRound(s, now);
 }
 
 /** Players whose vote we wait for: connected, and there is at least one meme that isn't theirs. */
@@ -337,13 +348,13 @@ function eligibleVoters(s: RoomState): PlayerState[] {
 }
 
 /** Skip the rest of the timer when everyone connected has submitted / voted. */
-export function advanceIfEveryoneDone(s: RoomState, now: number, templates = staticTemplates): void {
+export function advanceIfEveryoneDone(s: RoomState, now: number): void {
   const connected = connectedPlayers(s);
   if (connected.length === 0) return; // nobody here: let the timer decide
   if (s.phase === "CAPTION") {
-    if (connected.every((p) => s.submissions.some((x) => x.playerId === p.id))) closeCaptions(s, now, templates);
+    if (connected.every((p) => s.submissions.some((x) => x.playerId === p.id))) closeCaptions(s, now);
   } else if (s.phase === "VOTING") {
-    if (eligibleVoters(s).every((p) => s.votes[p.id])) finishRound(s, now, templates);
+    if (eligibleVoters(s).every((p) => s.votes[p.id])) finishRound(s, now);
   }
 }
 
@@ -355,7 +366,7 @@ export function advanceIfEveryoneDone(s: RoomState, now: number, templates = sta
  * Apply everything that is due at `now`: phase timers, lobby cleanup,
  * host migration. Returns true when the room should be destroyed.
  */
-export function tick(s: RoomState, now: number, templates = staticTemplates): boolean {
+export function tick(s: RoomState, now: number): boolean {
   // 1. Phase timers (loop in case several deadlines passed while asleep).
   for (let guard = 0; guard < 20 && s.phaseEndsAt !== null && now >= s.phaseEndsAt; guard++) {
     const at = s.phaseEndsAt;
@@ -364,18 +375,18 @@ export function tick(s: RoomState, now: number, templates = staticTemplates): bo
         setPhase(s, "CAPTION", at + s.settings.captionSeconds * S);
         break;
       case "CAPTION":
-        closeCaptions(s, at, templates);
+        closeCaptions(s, at);
         break;
       case "REVEAL":
         setPhase(s, "VOTING", at + s.settings.votingSeconds * S);
         // If nobody can vote (e.g. one meme, only its author online) don't wait.
-        advanceIfEveryoneDone(s, at, templates);
+        advanceIfEveryoneDone(s, at);
         break;
       case "VOTING":
-        finishRound(s, at, templates);
+        finishRound(s, at);
         break;
       case "ROUND_RESULTS":
-        endRoundResults(s, at, templates);
+        endRoundResults(s, at);
         break;
       default:
         s.phaseEndsAt = null;

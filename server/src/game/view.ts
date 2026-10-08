@@ -4,14 +4,13 @@
  * until the round results.
  */
 import type { PlayerView, RoomView } from "../../../shared/protocol";
-import { staticTemplates, type TemplateSource } from "./engine";
 import type { RoomState } from "./types";
 
 const SHOW_TEMPLATE = new Set(["CAPTION", "REVEAL", "VOTING", "ROUND_RESULTS"]);
 const SHOW_SUBMISSIONS = new Set(["REVEAL", "VOTING", "ROUND_RESULTS"]);
 const SHOW_RESULTS = new Set(["ROUND_RESULTS", "FINAL_RESULTS"]);
 
-export function buildView(s: RoomState, viewerId: string, templates: TemplateSource = staticTemplates): RoomView {
+export function buildView(s: RoomState, viewerId: string): RoomView {
   const mine = s.submissions.find((x) => x.playerId === viewerId) ?? null;
 
   const players: PlayerView[] = s.players.map((p) => ({
@@ -25,9 +24,7 @@ export function buildView(s: RoomState, viewerId: string, templates: TemplateSou
     hasVoted: Boolean(s.votes[p.id]),
   }));
 
-  const template = SHOW_TEMPLATE.has(s.phase)
-    ? (templates.list(null).find((t) => t.id === s.currentTemplateId) ?? null)
-    : null;
+  const template = SHOW_TEMPLATE.has(s.phase) ? s.currentTemplate : null;
 
   const submissions = SHOW_SUBMISSIONS.has(s.phase)
     ? s.revealOrder.map((id) => {
@@ -47,6 +44,8 @@ export function buildView(s: RoomState, viewerId: string, templates: TemplateSou
     players,
     template,
     submissions,
+    // During the countdown, send only the image URL so browsers can preload it.
+    preloadImage: s.phase === "COUNTDOWN" ? (s.currentTemplate?.image ?? null) : null,
     lastRound: SHOW_RESULTS.has(s.phase) ? s.lastRound : null,
     highlights: s.phase === "FINAL_RESULTS" ? s.highlights : [],
     you: {

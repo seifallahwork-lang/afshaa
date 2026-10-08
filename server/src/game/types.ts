@@ -1,6 +1,7 @@
 /** Server-only room state. Stored in the Durable Object; never sent raw to clients. */
 import type { GameSettings } from "../../../shared/config";
 import type { Highlight, Phase, RoundResult } from "../../../shared/protocol";
+import type { MemeTemplate } from "../../../shared/templates";
 
 export interface PlayerState {
   id: string;
@@ -23,7 +24,7 @@ export interface SubmissionState {
 }
 
 export interface RoomState {
-  version: 1;
+  version: 2;
   code: string;
   createdAt: number;
   phase: Phase;
@@ -32,8 +33,9 @@ export interface RoomState {
   players: PlayerState[]; // join order (used for host migration)
   gameNumber: number;
   round: number;
-  templateDeck: string[];
-  currentTemplateId: string | null;
+  /** The memes chosen for this game, one per round. */
+  deck: MemeTemplate[];
+  currentTemplate: MemeTemplate | null;
   phaseEndsAt: number | null;
   submissions: SubmissionState[];
   /** Shuffled submission ids — the anonymous order everybody sees. */

@@ -95,13 +95,13 @@ You need a free Cloudflare account. **Do not add a payment method.**
 3. Open **Workers & Pages** → **Create application** → **Get started** next to **Import a repository**.
 4. Select your GitHub account (click **Connect GitHub** and authorise Cloudflare the first time), then pick your repository.
 5. Configure the project:
-   - **Project name:** `afsha-server`. It must match `"name"` in `server/wrangler.jsonc`, or the build fails.
+   - **Project name:** `afshaa`. It must match `"name"` in `server/wrangler.jsonc`, or the build fails.
    - **Build command:** `npm install`
    - **Deploy command:** `npx wrangler deploy` (the default)
    - **Root directory** (under advanced/build settings): `server`
 6. Click **Save and Deploy**. Wait for the build log to finish (about a minute).
 7. If this is your first Worker, Cloudflare asks you to choose a **workers.dev subdomain** (e.g. `seif`). Pick any free name.
-8. Open the Worker's page. Copy its URL, which looks like **`https://afsha-server.seif.workers.dev`**. Opening it in a browser should show *"Afsha game server is running ✔"*.
+8. Open the Worker's page. Copy its URL, which looks like **`https://afshaa.seifallah-work.workers.dev`**. Opening it in a browser should show *"Afsha game server is running ✔"*.
 
 From now on, every push to GitHub redeploys the server automatically.
 
@@ -111,7 +111,7 @@ From now on, every push to GitHub redeploys the server automatically.
 cd server
 npm install
 npx wrangler login     # opens the browser to authorise; one time only
-npx wrangler deploy    # prints your URL: https://afsha-server.<subdomain>.workers.dev
+npx wrangler deploy    # prints your URL: https://afshaa.<subdomain>.workers.dev
 ```
 
 ### Lock the server to your website (recommended, after section 4)
@@ -135,7 +135,7 @@ Push again (Option A) or run `npx wrangler deploy` (Option B).
 3. Leave **Root Directory** as the repository root. `vercel.json` already tells Vercel how to build `client/`.
 4. Open **Environment Variables** and add:
    - **Name:** `VITE_GAME_SERVER_URL`
-   - **Value:** your Worker URL from step 3, e.g. `https://afsha-server.seif.workers.dev` (no trailing slash)
+   - **Value:** your Worker URL from step 3, e.g. `https://afshaa.seifallah-work.workers.dev` (no trailing slash)
 5. Click **Deploy**. You get a URL like `https://afsha.vercel.app`.
 
 If you change the environment variable later, go to **Deployments → ⋯ → Redeploy**, because Vite bakes it in at build time.
@@ -154,7 +154,7 @@ If the website shows *"السيرفر مش متظبط"*, the variable is missing
 To test online alone: open the URL on your phone (mobile data) and on your laptop, or in several browser tabs. To run the automated test against the live server:
 
 ```bash
-SERVER=https://afsha-server.seif.workers.dev npm run simulate
+SERVER=https://afshaa.seifallah-work.workers.dev npm run simulate
 ```
 
 ---
@@ -174,35 +174,43 @@ git push -u origin main
 
 ---
 
-## 7. Add meme templates
+## 7. Add meme templates (Google Drive)
 
-1. Put the image in **`client/public/templates/`**, e.g. `egypt_001.jpg`. JPG, PNG, WebP or SVG all work. Keep files under ~300 KB; around 1000 px wide is plenty.
-2. Add an entry to **`shared/templates.json`**:
+The game takes its memes from this Google Drive folder:
+https://drive.google.com/drive/folders/1IFlNv8pigQ6cqRXfIeUT06edaT4GlZDy
+The folder ID is set in `server/wrangler.jsonc` → `DRIVE_FOLDER_ID`.
 
-```json
-{
-  "id": "egypt_001",
-  "image": "/templates/egypt_001.jpg",
-  "name": "اسم الميم",
-  "categories": ["Egyptian", "Movies"],
-  "captionPosition": "bottom",
-  "enabled": true
-}
-```
+**To add a meme, upload the image to the folder.** It appears in the next game within about 5 minutes. Nothing else to edit and no redeploy.
 
-- `id` must be unique.
-- `captionPosition`: `"top"` or `"bottom"`. Pick whichever part of the image is less busy.
-- `categories`: any of `Egyptian, Arabic, TV, Movies, Football, University, Work, Relationships, Family, Everyday Life, Social Media, Random`.
-- `enabled: false` hides a template without deleting it.
-- `image` can also be a full `https://…` URL, e.g. later from Cloudinary or Supabase Storage.
+| You want… | Do this |
+|---|---|
+| Caption at the top of the image | Start the file name with `top` or `فوق`, e.g. `top - الواد بيبص.jpg` |
+| Caption at the bottom (default) | Any other name, e.g. `مراتي بتسألني.jpg` |
+| A category | Put the image in a sub-folder; the folder name is the category (`كورة`, `أفلام`, …) |
+| Hide a meme without deleting it | Move it into a sub-folder named `مخفي` |
 
-3. Push to GitHub. **Both** sides redeploy (Vercel serves the image; Cloudflare picks templates from the same JSON).
+Formats: JPG, PNG or WebP. Images under ~1 MB load fastest on phones.
 
-To remove the 12 placeholder templates, delete their `sample_…` entries and files. Keep at least as many templates as the most rounds you play (10) so memes don't repeat within a game.
+**Check what the server sees:** open `https://afshaa.seifallah-work.workers.dev/api/templates`. It shows `"source": "google-drive"` and the number of memes found.
 
-**Moving templates to a database later:** the game only calls `getActiveTemplates()` in `shared/templates.ts` and the `TemplateSource` interface in `server/src/game/engine.ts`. Replace that one source and the rest of the game is unchanged.
+### One-time setup: Google API key (free, ~10 minutes)
 
----
+1. Go to https://console.cloud.google.com and sign in with the Google account that owns the folder.
+2. At the top, click the project picker → **New project** → name it `afsha` → **Create**, and select it.
+3. Go to **APIs & Services → Library**, search **Google Drive API**, and click **Enable**.
+4. Go to **APIs & Services → Credentials → Create credentials → API key**. Copy the key.
+5. Recommended: click the new key → **API restrictions → Restrict key → Google Drive API → Save**.
+6. In Cloudflare, go to **Workers & Pages → afshaa → Settings → Variables and Secrets → Add**:
+   - Type: **Secret**
+   - Name: `GOOGLE_API_KEY`
+   - Value: the key
+
+   Then click **Deploy** (or Save).
+7. Open `/api/templates` (see above) to confirm the server sees your memes.
+
+The folder must stay shared as **"Anyone with the link → Viewer"**.
+
+**Fallback:** if the key is missing, Drive is unreachable, or the folder is empty, the game uses the built-in templates in `shared/templates.json` (images in `client/public/templates/`), so it never stops working.
 
 ## 8. Change the rules
 

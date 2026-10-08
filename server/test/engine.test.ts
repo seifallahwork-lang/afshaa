@@ -243,7 +243,7 @@ describe("game flow", () => {
     const seen = new Set<string>();
     for (let r = 1; r <= 3; r++) {
       expect(s.round).toBe(r);
-      seen.add(s.currentTemplateId!);
+      seen.add(s.currentTemplate!.id);
       playRound(s, ids);
     }
     expect(s.phase).toBe("FINAL_RESULTS");

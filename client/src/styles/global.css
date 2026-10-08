@@ -602,6 +602,9 @@ textarea {
   display: block;
   width: 100%;
   height: auto;
+  min-height: 160px; /* keeps the card's shape while a Drive image is loading */
+  object-fit: contain;
+  background: var(--ink);
   aspect-ratio: auto;
 }
 .meme-hero {

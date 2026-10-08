@@ -10,6 +10,7 @@ import type { ApiError, ErrorCode } from "../../shared/protocol";
 import { normalizeDigits } from "../../shared/text";
 import type { Env } from "./env";
 import { randomRoomCode } from "./game/random";
+import { describeTemplates } from "./templates/source";
 
 export { GameRoom } from "./room";
 
@@ -81,6 +82,9 @@ export default {
     if (url.pathname === "/" || url.pathname === "/api/health") {
       return new Response("Afsha game server is running ✔", { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     }
+    // GET /api/templates — check which memes the server sees (handy after uploading to Drive).
+    if (url.pathname === "/api/templates") return json(await describeTemplates(env), 200, origin);
+
     if (parts[0] !== "api" || parts[1] !== "rooms") return fail("BAD_REQUEST", origin);
 
     // POST /api/rooms — create a room with a fresh, unused 6-digit code.

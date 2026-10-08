@@ -31,6 +31,7 @@ import {
 import { GameError } from "./game/errors";
 import type { RoomState } from "./game/types";
 import { buildView } from "./game/view";
+import { getTemplates } from "./templates/source";
 import type { Env } from "./env";
 
 const STATE_KEY = "state";
@@ -46,7 +47,9 @@ export class GameRoom extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
-      this.state = (await ctx.storage.get<RoomState>(STATE_KEY)) ?? null;
+      const saved = (await ctx.storage.get<RoomState>(STATE_KEY)) ?? null;
+      // Rooms saved by an older version of the game are discarded (rooms are temporary anyway).
+      this.state = saved && saved.version === 2 ? saved : null;
     });
     // Heartbeats are answered by Cloudflare without waking the room.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
@@ -135,12 +138,16 @@ export class GameRoom extends DurableObject<Env> {
       return this.sendError(ws, "BAD_REQUEST");
     }
 
+    // Starting a game needs the meme list (from Google Drive), which is async.
+    const needsTemplates = msg?.type === "start" || msg?.type === "playAgain";
+    const templates = needsTemplates ? await getTemplates(this.env, s.settings.categories) : undefined;
+
     this.syncConnections(now);
     tick(s, now); // apply anything that was due before handling the action
     try {
       switch (msg?.type) {
         case "start":
-          startGame(s, playerId, now);
+          startGame(s, playerId, now, templates);
           break;
         case "updateSettings":
           updateSettings(s, playerId, msg.settings);
@@ -155,7 +162,7 @@ export class GameRoom extends DurableObject<Env> {
           skip(s, playerId, now);
           break;
         case "playAgain":
-          playAgain(s, playerId, now);
+          playAgain(s, playerId, now, templates);
           break;
         case "returnToLobby":
           returnToLobby(s, playerId);

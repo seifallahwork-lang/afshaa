@@ -134,6 +134,8 @@ export interface RoomView {
   template: MemeTemplate | null;
   /** Anonymous, shuffled. Present from REVEAL onwards. */
   submissions: SubmissionView[] | null;
+  /** Next meme's image URL during the countdown, so it is already loaded when the round starts. */
+  preloadImage: string | null;
   lastRound: RoundResult | null;
   highlights: Highlight[];
   you: {

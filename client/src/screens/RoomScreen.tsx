@@ -17,6 +17,15 @@ import { VotingScreen } from "./VotingScreen";
 export function RoomScreen({ session, onExit }: { session: SessionResponse; onExit: (message?: string) => void }) {
   const { state, status, ended, clockOffset, error, send } = useRoom(session);
 
+  // Warm the browser cache with the next meme during the 3-second countdown.
+  const preload = state?.preloadImage;
+  useEffect(() => {
+    if (!preload) return;
+    const img = new Image();
+    img.referrerPolicy = "no-referrer";
+    img.src = preload;
+  }, [preload]);
+
   useEffect(() => {
     if (ended === "LEFT") onExit();
     else if (ended === "EXPIRED") onExit(t.endedExpired);
