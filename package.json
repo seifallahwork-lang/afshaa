@@ -1,0 +1,13 @@
+{
+  "name": "afsha",
+  "private": true,
+  "description": "قفشة — Egyptian meme-caption party game (client on Vercel, server on Cloudflare).",
+  "scripts": {
+    "setup": "npm install --prefix server && npm install --prefix client",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "test": "npm test --prefix server",
+    "simulate": "node scripts/simulate.mjs",
+    "build": "npm run build --prefix client"
+  }
+}

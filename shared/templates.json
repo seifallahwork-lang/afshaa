@@ -1,0 +1,130 @@
+{
+  "$comment": "Add a meme: put the image in client/public/templates/ and add an entry here. categories: Egyptian, Arabic, TV, Movies, Football, University, Work, Relationships, Family, Everyday Life, Social Media, Random. captionPosition: top | bottom. enabled: false hides it.",
+  "templates": [
+    {
+      "id": "sample_001",
+      "image": "/templates/sample_001.svg",
+      "name": "قاعد على القهوة",
+      "categories": [
+        "Egyptian",
+        "Everyday Life"
+      ],
+      "captionPosition": "top",
+      "enabled": true
+    },
+    {
+      "id": "sample_002",
+      "image": "/templates/sample_002.svg",
+      "name": "التليفون بيرن",
+      "categories": [
+        "Everyday Life",
+        "Family"
+      ],
+      "captionPosition": "bottom",
+      "enabled": true
+    },
+    {
+      "id": "sample_003",
+      "image": "/templates/sample_003.svg",
+      "name": "الامتحان بكرة",
+      "categories": [
+        "University"
+      ],
+      "captionPosition": "top",
+      "enabled": true
+    },
+    {
+      "id": "sample_004",
+      "image": "/templates/sample_004.svg",
+      "name": "الماتش في الوقت الضايع",
+      "categories": [
+        "Football"
+      ],
+      "captionPosition": "bottom",
+      "enabled": true
+    },
+    {
+      "id": "sample_005",
+      "image": "/templates/sample_005.svg",
+      "name": "ماما بتنادي من المطبخ",
+      "categories": [
+        "Family"
+      ],
+      "captionPosition": "top",
+      "enabled": true
+    },
+    {
+      "id": "sample_006",
+      "image": "/templates/sample_006.svg",
+      "name": "آخر ساعة يوم الخميس",
+      "categories": [
+        "Work"
+      ],
+      "captionPosition": "bottom",
+      "enabled": true
+    },
+    {
+      "id": "sample_007",
+      "image": "/templates/sample_007.svg",
+      "name": "الميكروباص الكامل",
+      "categories": [
+        "Egyptian",
+        "Everyday Life"
+      ],
+      "captionPosition": "top",
+      "enabled": true
+    },
+    {
+      "id": "sample_008",
+      "image": "/templates/sample_008.svg",
+      "name": "القطة اللي شايفة كل حاجة",
+      "categories": [
+        "Random"
+      ],
+      "captionPosition": "bottom",
+      "enabled": true
+    },
+    {
+      "id": "sample_009",
+      "image": "/templates/sample_009.svg",
+      "name": "النت فصل",
+      "categories": [
+        "Social Media"
+      ],
+      "captionPosition": "top",
+      "enabled": true
+    },
+    {
+      "id": "sample_010",
+      "image": "/templates/sample_010.svg",
+      "name": "الفرح الشعبي",
+      "categories": [
+        "Egyptian"
+      ],
+      "captionPosition": "bottom",
+      "enabled": true
+    },
+    {
+      "id": "sample_011",
+      "image": "/templates/sample_011.svg",
+      "name": "سين ومردش",
+      "categories": [
+        "Relationships",
+        "Social Media"
+      ],
+      "captionPosition": "top",
+      "enabled": true
+    },
+    {
+      "id": "sample_012",
+      "image": "/templates/sample_012.svg",
+      "name": "طبق الكشري",
+      "categories": [
+        "Egyptian",
+        "Everyday Life"
+      ],
+      "captionPosition": "bottom",
+      "enabled": true
+    }
+  ]
+}
