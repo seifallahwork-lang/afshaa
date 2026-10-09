@@ -5,15 +5,25 @@ import { useState, type FormEvent } from "react";
 import { Avatar } from "../components/Avatar";
 import { AvatarBuilder } from "../components/AvatarBuilder";
 import { DeveloperButton } from "../components/DeveloperCard";
+import { HowToPlayButton } from "../components/Modals";
 import { SoundControl } from "../components/SoundControl";
 import { Toast } from "../components/Toast";
 import { Button, Fringe, Logo } from "../components/ui";
-import { errorText, t } from "../i18n/ar";
+import { errorText, t } from "../i18n";
 import { ApiFailure, createRoom, joinRoom } from "../lib/api";
 import { SERVER_URL } from "../lib/config";
-import { loadAvatar, loadName, roomFromUrl, saveAvatar, saveName } from "../lib/session";
+import { loadAvatar, loadLastSession, loadName, roomFromUrl, saveAvatar, saveName } from "../lib/session";
 
-export function HomeScreen({ onEnter, notice }: { onEnter: (s: SessionResponse) => void; notice?: string | null }) {
+export function HomeScreen({
+  onEnter,
+  notice,
+  onToggleLang,
+}: {
+  onEnter: (s: SessionResponse) => void;
+  notice?: string | null;
+  onToggleLang: () => void;
+}) {
+  const last = loadLastSession();
   const [name, setName] = useState(loadName);
   const [avatar, setAvatar] = useState(loadAvatar);
   const [building, setBuilding] = useState(false);
@@ -52,14 +62,27 @@ export function HomeScreen({ onEnter, notice }: { onEnter: (s: SessionResponse) 
           <Logo />
           <p className="tagline">{t.tagline}</p>
           <p className="pitch">{t.pitch}</p>
+          <div className="home-tools">
+            <SoundControl variant="pill" />
+            <HowToPlayButton />
+            <button type="button" className="pill-btn" onClick={onToggleLang} lang={t.langToggle === "عربي" ? "ar" : "ar-Latn"}>
+              🔤 {t.langToggle}
+            </button>
+          </div>
         </div>
+
+        {last && (
+          <button type="button" className="rejoin-btn" onClick={() => onEnter(last)}>
+            ↩️ {t.rejoin(last.code)}
+          </button>
+        )}
 
         {!SERVER_URL && <div className="banner banner-static">{t.noServer}</div>}
 
         <form className="panel home-form" onSubmit={(e) => run(invited ? "join" : "host", e)}>
           <div className="me-row">
             <button type="button" className="avatar-edit" onClick={() => setBuilding(true)} aria-label={t.avatarTitle}>
-              <Avatar avatar={avatar} size={76} />
+              <Avatar avatar={avatar} size={104} />
               <span className="avatar-edit-label">✏️ {t.avatarEdit}</span>
             </button>
           <label className="field">
@@ -118,7 +141,6 @@ export function HomeScreen({ onEnter, notice }: { onEnter: (s: SessionResponse) 
         <p className="facts">{t.facts}</p>
       </div>
       <Toast message={error?.msg ?? null} at={error?.at ?? 0} />
-      <SoundControl className="corner-sound" />
       <DeveloperButton />
       {building && (
         <AvatarBuilder

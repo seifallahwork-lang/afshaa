@@ -9,5 +9,5 @@ export const DEVELOPER = {
   note: "تم تصميم هذه اللعبة باستخدام أوامر كلود.",
   linkedin: "https://www.linkedin.com/in/seif-kha/",
   email: "seifallah.work@gmail.com",
-  whatsapp: "",
+  whatsapp: "201060819675",
 };

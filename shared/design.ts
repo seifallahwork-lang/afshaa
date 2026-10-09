@@ -37,6 +37,27 @@ export interface TextBox {
   bg: string;
   rounded: boolean;
   size: number; // font size in % of image width
+  /** Rotation in degrees (−180…180). */
+  rotate: number;
+  /** Outline around the letters (classic meme look). */
+  outline: boolean;
+}
+
+/** Crop window on the template, in % of the original image. `ar` = original width / height. */
+export interface Crop {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  ar: number;
+}
+
+/** A caption bar outside the image (above or below it), like a tweet over a picture. */
+export interface Strip {
+  text: string;
+  position: "top" | "bottom";
+  color: string;
+  bg: string;
 }
 
 export interface Stroke {
@@ -48,6 +69,8 @@ export interface Stroke {
 export interface MemeDesign {
   boxes: TextBox[];
   strokes: Stroke[];
+  crop?: Crop | null;
+  strip?: Strip | null;
 }
 
 export type DesignErrorCode = "EMPTY_CAPTION" | "CAPTION_TOO_LONG" | "BLOCKED_WORD" | "BAD_REQUEST";
@@ -67,7 +90,7 @@ const pick = <T extends readonly string[]>(v: unknown, list: T, fallback: T[numb
 /** Validate + normalize. Throws DesignError. */
 export function sanitizeDesign(raw: unknown): MemeDesign {
   if (!raw || typeof raw !== "object") throw new DesignError("BAD_REQUEST");
-  const r = raw as { boxes?: unknown; strokes?: unknown };
+  const r = raw as { boxes?: unknown; strokes?: unknown; crop?: any; strip?: any };
   const rawBoxes = Array.isArray(r.boxes) ? r.boxes.slice(0, DESIGN_LIMITS.maxBoxes) : [];
   const rawStrokes = Array.isArray(r.strokes) ? r.strokes.slice(0, DESIGN_LIMITS.maxStrokes) : [];
 
@@ -93,6 +116,8 @@ export function sanitizeDesign(raw: unknown): MemeDesign {
       bg: pick(b.bg, BG_COLORS, "transparent"),
       rounded: b.rounded === true,
       size: num(b.size, DESIGN_LIMITS.minFont, DESIGN_LIMITS.maxFont, DESIGN_LIMITS.defaultFont),
+      rotate: Math.round(num(b.rotate, -180, 180, 0)),
+      outline: typeof b.outline === "boolean" ? b.outline : pick(b.bg, BG_COLORS, "transparent") === "transparent",
     });
   });
   if (totalChars > DESIGN_LIMITS.maxTotalChars) throw new DesignError("CAPTION_TOO_LONG");
@@ -113,16 +138,48 @@ export function sanitizeDesign(raw: unknown): MemeDesign {
     });
   }
 
-  if (boxes.length === 0 && strokes.length === 0) throw new DesignError("EMPTY_CAPTION");
-  return { boxes, strokes };
+  let crop: Crop | null = null;
+  if (r.crop && typeof r.crop === "object") {
+    const w = num(r.crop.w, 10, 100, 100);
+    const h = num(r.crop.h, 10, 100, 100);
+    crop = { w, h, x: num(r.crop.x, 0, 100 - w, 0), y: num(r.crop.y, 0, 100 - h, 0), ar: Math.min(5, Math.max(0.2, Number(r.crop.ar) || 1)) };
+    if (w === 100 && h === 100) crop = null;
+  }
+
+  let strip: Strip | null = null;
+  if (r.strip && typeof r.strip === "object") {
+    const text = cleanText(typeof r.strip.text === "string" ? r.strip.text : "");
+    if (text) {
+      if (textLength(text) > DESIGN_LIMITS.maxBoxChars) throw new DesignError("CAPTION_TOO_LONG");
+      if (containsBlockedWord(text)) throw new DesignError("BLOCKED_WORD");
+      strip = {
+        text,
+        position: r.strip.position === "top" ? "top" : "bottom",
+        color: pick(r.strip.color, TEXT_COLORS, "#000000"),
+        bg: pick(r.strip.bg, TEXT_COLORS, "#FFFFFF"),
+      };
+    }
+  }
+
+  if (boxes.length === 0 && strokes.length === 0 && !strip) throw new DesignError("EMPTY_CAPTION");
+  return { boxes, strokes, crop, strip };
 }
 
 /** True when there's nothing to submit (no text and no drawing). */
 export function isDesignEmpty(d: MemeDesign): boolean {
-  return !d.boxes.some((b) => b.text.trim()) && d.strokes.every((s) => s.points.length < 4);
+  return !d.boxes.some((b) => b.text.trim()) && d.strokes.every((s) => s.points.length < 4) && !d.strip?.text.trim();
+}
+
+/** Lenient version for drafts: returns null instead of throwing. */
+export function tryDesign(raw: unknown): MemeDesign | null {
+  try {
+    return sanitizeDesign(raw);
+  } catch {
+    return null;
+  }
 }
 
 /** All text in a meme, for lists and accessibility. */
 export function designText(d: MemeDesign): string {
-  return d.boxes.map((b) => b.text).join(" — ");
+  return [d.strip?.text, ...d.boxes.map((b) => b.text)].filter(Boolean).join(" — ");
 }

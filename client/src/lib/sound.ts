@@ -32,18 +32,29 @@ class SoundManager {
   private unlocked = false;
   private listeners = new Set<() => void>();
 
-  /** Call once at startup: waits for the first tap/click/key to unlock audio. */
+  /**
+   * Call once at startup. The music file starts downloading immediately and
+   * playback is attempted right away. Browsers only allow sound after the
+   * visitor interacts with the page, so if that's blocked the music is already
+   * playing silently and simply un-mutes on the very first tap / click / key.
+   */
   init(): void {
+    if (this.settings.musicOn) {
+      const m = this.ensureMusic();
+      m.play().catch(() => {
+        m.muted = true; // muted autoplay is allowed everywhere
+        m.play().catch(() => undefined);
+      });
+    }
     const unlock = () => {
       if (this.unlocked) return;
       this.unlocked = true;
       this.ensureCtx();
+      if (this.music) this.music.muted = false;
       if (this.settings.musicOn) this.playMusic();
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
+      for (const ev of ["pointerdown", "keydown", "touchstart", "scroll"] as const) window.removeEventListener(ev, unlock);
     };
-    window.addEventListener("pointerdown", unlock);
-    window.addEventListener("keydown", unlock);
+    for (const ev of ["pointerdown", "keydown", "touchstart", "scroll"] as const) window.addEventListener(ev, unlock, { passive: true });
   }
 
   subscribe(fn: () => void): () => void {
@@ -80,6 +91,7 @@ class SoundManager {
 
   setMusicOn(on: boolean): void {
     this.settings.musicOn = on;
+    if (this.music) this.music.muted = false;
     if (on) this.playMusic();
     else this.music?.pause();
     this.save();

@@ -14,6 +14,11 @@ import {
   returnToLobby,
   startGame,
   submitMeme,
+  reroll,
+  saveDraft,
+  setReady,
+  transferHost,
+  chat,
   tick,
   updateSettings,
 } from "../src/game/engine";
@@ -36,6 +41,7 @@ function room(n: number) {
   for (let i = 0; i < n; i++) {
     const p = addPlayer(s, `لاعب ${i + 1}`, T0);
     markConnected(s, p.id, T0);
+    if (i > 0) setReady(s, p.id, true);
     ids.push(p.id);
   }
   return { s, ids };
@@ -77,10 +83,30 @@ describe("rooms & lobby", () => {
     expectError(() => addPlayer(s, "الحادي عشر", T0), "ROOM_FULL");
   });
 
-  it("rejects joining after the game started", () => {
+  it("allows joining mid-game; the newcomer gets a meme right away", () => {
     const { s, ids } = room(3);
     startGame(s, ids[0], T0);
-    expectError(() => addPlayer(s, "متأخر", T0), "GAME_STARTED");
+    const late = addPlayer(s, "متأخر", T0);
+    markConnected(s, late.id, T0);
+    expect(s.assignments[late.id]?.template).toBeTruthy();
+    expect(s.players.length).toBe(4);
+  });
+
+  it("host can start only when everyone is ready", () => {
+    const { s, ids } = room(3);
+    setReady(s, ids[2], false);
+    expectError(() => startGame(s, ids[0], T0), "NOT_READY");
+    setReady(s, ids[2], true);
+    startGame(s, ids[0], T0);
+    expect(s.phase).toBe("COUNTDOWN");
+  });
+
+  it("host can hand the room to another player", () => {
+    const { s, ids } = room(3);
+    expectError(() => transferHost(s, ids[1], ids[2]), "NOT_HOST");
+    transferHost(s, ids[0], ids[2]);
+    expect(s.hostId).toBe(ids[2]);
+    expectError(() => transferHost(s, ids[0], ids[1]), "NOT_HOST");
   });
 
   it("validates names and duplicates (Arabic-normalized)", () => {
@@ -269,11 +295,11 @@ describe("meme designs", () => {
 });
 
 describe("AI hint", () => {
-  it("costs points once per round, can be refunded, and is cached per meme", () => {
+  it("costs points once per meme, can be refunded, and is cached per meme", () => {
     const { s, ids } = room(2);
     startGame(s, ids[0], T0);
     const t = toCaption(s);
-    const tpl = s.currentTemplate!.id;
+    const tpl = s.assignments[ids[0]].template.id;
     expect(requestHint(s, ids[0], t)).toBeNull();
     expect(s.players[0].score).toBe(-GAME_CONFIG.hintCost);
     expectError(() => requestHint(s, ids[0], t), "HINT_USED");
@@ -283,8 +309,67 @@ describe("AI hint", () => {
     resolveHint(s, ids[0], s.round, tpl, "بص على وشه 😂");
     expect(buildView(s, ids[0]).you.hint).toEqual({ status: "ready", text: "بص على وشه 😂" });
     expect(buildView(s, ids[1]).you.hint).toBeNull(); // private
-    expect(requestHint(s, ids[1], t)).toBe("بص على وشه 😂"); // cached: no second AI call
-    expect(s.players[1].score).toBe(-GAME_CONFIG.hintCost);
+    s.hintCache[s.assignments[ids[1]].template.id] = "مخزّن";
+    expect(requestHint(s, ids[1], t)).toBe("مخزّن"); // cached: no second AI call
+  });
+});
+
+describe("per-player memes, rerolls, drafts, chat, blind mode", () => {
+  it("each player gets a different meme; rerolls are limited per round", () => {
+    const { s, ids } = room(3);
+    updateSettings(s, ids[0], { rerolls: 3 });
+    startGame(s, ids[0], T0);
+    const t = toCaption(s);
+    const mine = () => ids.map((id) => s.assignments[id].template.id);
+    expect(new Set(mine()).size).toBe(3);
+    const seen = new Set([s.assignments[ids[0]].template.id]);
+    for (let i = 0; i < 3; i++) {
+      reroll(s, ids[0], t);
+      seen.add(s.assignments[ids[0]].template.id);
+    }
+    expect(seen.size).toBe(4); // never shown the same meme twice
+    expect(new Set(mine()).size).toBe(3); // still nobody shares a meme
+    expectError(() => reroll(s, ids[0], t), "NO_REROLLS");
+    expect(buildView(s, ids[0]).you.rerollsLeft).toBe(0);
+    expect(buildView(s, ids[1]).you.rerollsLeft).toBe(3);
+  });
+
+  it("unfinished work is submitted automatically when time runs out", () => {
+    const { s, ids } = room(3);
+    startGame(s, ids[0], T0);
+    const t = toCaption(s);
+    submitMeme(s, ids[0], cap("خلصت"), t);
+    saveDraft(s, ids[1], cap("لسه بكتب…"), t);
+    saveDraft(s, ids[2], { boxes: [{ text: "  " }], strokes: [] }, t); // empty draft = nothing
+    expire(s);
+    expect(s.phase).toBe("REVEAL");
+    expect(s.submissions.length).toBe(2);
+    expect(s.submissions.find((x) => x.playerId === ids[1])!.design.boxes[0].text).toBe("لسه بكتب…");
+  });
+
+  it("chat keeps names, blocks spam bursts", () => {
+    const { s, ids } = room(2);
+    chat(s, ids[0], "يلا بينا 😂", T0);
+    expectError(() => chat(s, ids[0], "تاني", T0 + 100), "CHAT_TOO_FAST");
+    chat(s, ids[1], "جاهز", T0 + 100);
+    expect(buildView(s, ids[1]).chat.map((m) => [m.name, m.text])).toEqual([
+      ["لاعب 1", "يلا بينا 😂"],
+      ["لاعب 2", "جاهز"],
+    ]);
+  });
+
+  it("blind mode hides authors while voting; open mode shows them", () => {
+    for (const anonymous of [true, false]) {
+      const { s, ids } = room(2);
+      updateSettings(s, ids[0], { anonymous });
+      startGame(s, ids[0], T0);
+      const t = toCaption(s);
+      ids.forEach((id) => submitMeme(s, id, cap("x"), t));
+      expire(s);
+      const sub = buildView(s, ids[0]).submissions![0];
+      expect(sub.author === null).toBe(anonymous);
+      expect(sub.template).toBeTruthy();
+    }
   });
 });
 
@@ -307,7 +392,7 @@ describe("game flow", () => {
     const seen = new Set<string>();
     for (let r = 1; r <= 3; r++) {
       expect(s.round).toBe(r);
-      seen.add(s.currentTemplate!.id);
+      seen.add(s.assignments[ids[0]].template.id);
       playRound(s, ids);
     }
     expect(s.phase).toBe("FINAL_RESULTS");
@@ -370,6 +455,6 @@ describe("disconnects, host migration, expiry", () => {
 
     const lobby = room(1);
     markDisconnected(lobby.s, lobby.ids[0], T0);
-    expect(tick(lobby.s, T0 + 61 * S)).toBe(true);
+    expect(tick(lobby.s, T0 + (GAME_CONFIG.lobbyDisconnectGraceSeconds + 1) * S)).toBe(true);
   });
 });

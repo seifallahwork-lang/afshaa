@@ -1,11 +1,12 @@
 /** Connects to the room and shows the screen for the current phase. */
 import type { SessionResponse } from "@shared/protocol";
 import { useEffect } from "react";
+import { Chat } from "../components/Chat";
 import { ConnectionBanner, TopBar } from "../components/game";
 import { Toast } from "../components/Toast";
 import { Fringe } from "../components/ui";
 import { useRoom } from "../hooks/useRoom";
-import { errorText, t } from "../i18n/ar";
+import { errorText, t } from "../i18n";
 import { CaptionScreen } from "./CaptionScreen";
 import { CountdownScreen } from "./CountdownScreen";
 import { FinalScreen } from "./FinalScreen";
@@ -85,6 +86,7 @@ export function RoomScreen({ session, onExit }: { session: SessionResponse; onEx
       <TopBar state={state} status={status} />
       <ConnectionBanner status={status} />
       <div className="room-body">{screen}</div>
+      <Chat messages={state.chat} youId={state.you.id} send={send} />
       <Toast message={error ? errorText[error.code] : null} at={error?.at ?? 0} />
     </main>
   );

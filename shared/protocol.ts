@@ -38,6 +38,10 @@ export type ErrorCode =
   | "HINT_USED"
   | "HINT_UNAVAILABLE"
   | "HINT_FAILED"
+  | "NO_REROLLS"
+  | "NOT_READY"
+  | "CHAT_TOO_FAST"
+  | "INVALID_TARGET"
   | "BAD_REQUEST"
   | "CODE_IN_USE"
   | "SERVER_ERROR";
@@ -74,6 +78,11 @@ export type ClientMessage =
   | { type: "submitMeme"; design: MemeDesign }
   | { type: "rate"; submissionId: string; stars?: number; angry?: boolean; comment?: string }
   | { type: "requestHint" }
+  | { type: "reroll" } // swap my meme template (limited per round)
+  | { type: "draft"; design: MemeDesign } // autosave; auto-submitted when time runs out
+  | { type: "chat"; text: string }
+  | { type: "ready"; ready: boolean }
+  | { type: "transferHost"; playerId: string }
   | { type: "skip" } // host: skip the round-results wait
   | { type: "playAgain" } // host: same players, new game
   | { type: "returnToLobby" } // host
@@ -102,6 +111,7 @@ export interface PlayerView {
   isHost: boolean;
   connected: boolean;
   left: boolean;
+  ready: boolean;
   score: number;
   /** Only "has / hasn't" — never the meme itself before the reveal. */
   hasSubmitted: boolean;
@@ -111,7 +121,19 @@ export interface PlayerView {
 
 export interface SubmissionView {
   id: string;
+  template: MemeTemplate;
   design: MemeDesign;
+  /** Only when the host turned blind voting off. */
+  author: { name: string; avatar: Avatar } | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  name: string;
+  avatar: Avatar;
+  text: string;
+  at: number;
 }
 
 export interface RoundComment {
@@ -126,6 +148,7 @@ export interface RoundEntry {
   playerId: string;
   playerName: string;
   avatar: Avatar;
+  template: MemeTemplate;
   design: MemeDesign;
   stars: number; // total stars received
   raters: number; // how many people gave stars
@@ -138,7 +161,6 @@ export interface RoundEntry {
 
 export interface RoundResult {
   round: number;
-  template: MemeTemplate;
   entries: RoundEntry[]; // sorted, best first
   winnerIds: string[];
   /** Names of players who paid for an AI hint this round. */
@@ -162,18 +184,23 @@ export interface RoomView {
   phaseEndsAt: number | null;
   hostId: string | null;
   players: PlayerView[];
-  template: MemeTemplate | null;
   /** Anonymous, shuffled. Present from REVEAL onwards. */
   submissions: SubmissionView[] | null;
   /** Next meme's image URL during the countdown, so it is already loaded when the round starts. */
   preloadImage: string | null;
   lastRound: RoundResult | null;
   highlights: Highlight[];
-  /** Is the AI hint available on this server? */
+  /** Is the AI hint available for my current meme? */
   hintsEnabled: boolean;
+  chat: ChatMessage[];
   you: {
     id: string;
     isHost: boolean;
+    /** My meme template this round (each player gets a different one). */
+    template: MemeTemplate | null;
+    rerollsLeft: number;
+    /** Autosaved work-in-progress, restored after a refresh. */
+    draft: MemeDesign | null;
     myDesign: MemeDesign | null;
     mySubmissionId: string | null;
     /** submissionId -> my rating */

@@ -12,6 +12,7 @@ import { DurableObject } from "cloudflare:workers";
 import { CLOSE_CODES, type ClientMessage, type ErrorCode, type ServerMessage, type SessionResponse } from "../../shared/protocol";
 import {
   addPlayer,
+  chat,
   createRoomState,
   findByToken,
   findPlayer,
@@ -22,6 +23,10 @@ import {
   playAgain,
   rate,
   refundHint,
+  reroll,
+  saveDraft,
+  setReady,
+  transferHost,
   requestHint,
   resolveHint,
   returnToLobby,
@@ -53,7 +58,7 @@ export class GameRoom extends DurableObject<Env> {
     ctx.blockConcurrencyWhile(async () => {
       const saved = (await ctx.storage.get<RoomState>(STATE_KEY)) ?? null;
       // Rooms saved by an older version of the game are discarded (rooms are temporary anyway).
-      this.state = saved && saved.version === 3 ? saved : null;
+      this.state = saved && saved.version === 4 ? saved : null;
     });
     // Heartbeats are answered by Cloudflare without waking the room.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
@@ -165,6 +170,23 @@ export class GameRoom extends DurableObject<Env> {
         case "requestHint":
           await this.handleHint(ws, s, playerId, now);
           return; // handleHint commits itself
+        case "reroll":
+          reroll(s, playerId, now);
+          break;
+        case "draft":
+          // Autosave: persist quietly, no need to push a new view to everyone.
+          saveDraft(s, playerId, msg.design, now);
+          await this.ctx.storage.put(STATE_KEY, s);
+          return;
+        case "chat":
+          chat(s, playerId, msg.text, now);
+          break;
+        case "ready":
+          setReady(s, playerId, msg.ready);
+          break;
+        case "transferHost":
+          transferHost(s, playerId, msg.playerId);
+          break;
         case "skip":
           skip(s, playerId, now);
           break;
@@ -213,14 +235,14 @@ export class GameRoom extends DurableObject<Env> {
 
   /* ---------------- AI hint ---------------- */
 
-  private hintsEnabled(): boolean {
-    return Boolean(this.env.AI) && Boolean(this.state?.currentTemplate?.image.startsWith("http"));
+  private aiAvailable(): boolean {
+    return Boolean(this.env.AI);
   }
 
   /** Charge 10 points, show "thinking…", ask the AI, then show the hint (or refund on failure). */
   private async handleHint(ws: WebSocket, s: RoomState, playerId: string, now: number): Promise<void> {
-    const template = s.currentTemplate;
-    if (!template || !this.hintsEnabled()) {
+    const template = s.assignments[playerId]?.template;
+    if (!template || !this.aiAvailable() || !template.id.startsWith("gd_")) {
       this.sendError(ws, "HINT_UNAVAILABLE");
       return;
     }
@@ -290,7 +312,7 @@ export class GameRoom extends DurableObject<Env> {
         this.safeClose(ws, CLOSE_CODES.INVALID_TOKEN, "INVALID_TOKEN");
         continue;
       }
-      const msg: ServerMessage = { type: "state", state: buildView(s, playerId, this.hintsEnabled()), serverNow: now };
+      const msg: ServerMessage = { type: "state", state: buildView(s, playerId, this.aiAvailable()), serverNow: now };
       try {
         ws.send(JSON.stringify(msg));
       } catch {

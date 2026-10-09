@@ -1,20 +1,23 @@
 import { AVATAR_PARTS, randomAvatar, type Avatar as AvatarData, type AvatarPart } from "@shared/avatar";
 import { useState } from "react";
-import { t } from "../i18n/ar";
-import { Avatar, BG, EYE_COLOR, HAIR_COLOR, SKIN } from "./Avatar";
+import { t } from "../i18n";
+import { Avatar, BG, EYE_COLOR, HAIR_COLOR, SHIRT, SKIN } from "./Avatar";
 import { Button } from "./ui";
 
-const TABS: { part: AvatarPart; label: string; colors?: string[] }[] = [
-  { part: "hair", label: "التسريحة" },
-  { part: "hairColor", label: "لون الشعر", colors: HAIR_COLOR },
-  { part: "skin", label: "البشرة", colors: SKIN },
-  { part: "eyes", label: "شكل العين" },
-  { part: "eyeColor", label: "لون العين", colors: EYE_COLOR },
-  { part: "mouth", label: "البُق" },
-  { part: "beard", label: "الدقن" },
-  { part: "glasses", label: "النضارة" },
-  { part: "hat", label: "الطاقية" },
-  { part: "bg", label: "الخلفية", colors: BG },
+const TABS: { part: AvatarPart; colors?: string[] }[] = [
+  { part: "hair" },
+  { part: "hairColor", colors: HAIR_COLOR },
+  { part: "skin", colors: SKIN },
+  { part: "eyebrows" },
+  { part: "eyes" },
+  { part: "eyeColor", colors: EYE_COLOR },
+  { part: "mouth" },
+  { part: "beard" },
+  { part: "glasses" },
+  { part: "hat" },
+  { part: "shirt", colors: SHIRT },
+  { part: "extra" },
+  { part: "bg", colors: BG },
 ];
 
 /** Full-screen sheet to build an avatar quickly. Shape options show live mini-previews. */
@@ -34,7 +37,7 @@ export function AvatarBuilder({
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={t.avatarTitle}>
       <div className="sheet avatar-sheet">
         <div className="avatar-preview">
-          <Avatar avatar={draft} size={132} />
+          <Avatar avatar={draft} size={150} />
           <Button variant="secondary" type="button" onClick={() => setDraft(randomAvatar())}>
             🎲 {t.avatarRandom}
           </Button>
@@ -50,12 +53,12 @@ export function AvatarBuilder({
               className={x.part === tab ? "on" : ""}
               onClick={() => setTab(x.part)}
             >
-              {x.label}
+              {t.avatarParts[x.part]}
             </button>
           ))}
         </div>
 
-        <div className="avatar-options" role="radiogroup" aria-label={current.label}>
+        <div className="avatar-options" role="radiogroup" aria-label={t.avatarParts[current.part]}>
           {Array.from({ length: AVATAR_PARTS[tab] }, (_, i) => (
             <button
               key={i}
@@ -68,7 +71,7 @@ export function AvatarBuilder({
               {current.colors ? (
                 <span className="swatch-big" style={{ background: current.colors[i] }} />
               ) : (
-                <Avatar avatar={{ ...draft, [tab]: i }} size={56} />
+                <Avatar avatar={{ ...draft, [tab]: i }} size={64} />
               )}
             </button>
           ))}

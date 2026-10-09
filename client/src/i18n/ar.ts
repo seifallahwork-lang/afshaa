@@ -1,17 +1,21 @@
 /**
- * All interface text in one place (Egyptian Arabic).
- * A future English version = a second file with the same keys.
+ * Interface text — Egyptian Arabic (the default language).
+ * franco.ts has the same keys in Franco-Arab (Arabizi).
  */
 import type { ErrorCode } from "@shared/protocol";
 
-export const t = {
+export const ar = {
+  dir: "rtl" as "rtl" | "ltr",
+  langCode: "ar",
+  langToggle: "Franco",
+
   gameName: "قفشة",
   tagline: "مين هيطلع أظرف واحد في الشلة؟",
-  pitch: "كلكم بتشوفوا نفس الميم، كل واحد يكتب الكابشن بتاعه، وبعدين تصوّتوا على الأظرف.",
+  pitch: "كل واحد بيجيله ميم مختلف، يكتب عليه أظرف كابشن، وبعدين الشلة كلها تقيّم ميمز بعض.",
   facts: "من ٢ لـ ١٠ لاعبين، ومن غير تسجيل.",
 
   yourName: "اسمك إيه؟",
-  namePlaceholder: "مثلاً: سيف",
+  namePlaceholder: "مثلاً: حموكشة",
   host: "إنشاء لعبة",
   join: "انضم للعبة",
   roomCodeLabel: "كود الأوضة",
@@ -84,6 +88,7 @@ export const t = {
   avatarTitle: "اعمل الأفاتار بتاعك",
   avatarEdit: "غيّر شكلك",
   avatarRandom: "عشوائي",
+  avatarParts: { hair: "التسريحة", hairColor: "لون الشعر", skin: "البشرة", eyebrows: "الحواجب", eyes: "شكل العين", eyeColor: "لون العين", mouth: "البُق", beard: "الدقن", glasses: "النضارة", hat: "الطاقية", shirt: "التيشيرت", extra: "إضافات", bg: "الخلفية" } as Record<import("@shared/avatar").AvatarPart, string>,
   avatarDone: "تمام كده",
 
   // meme editor
@@ -146,9 +151,87 @@ export const t = {
   endedToken: "الجلسة دي خلصت. ادخل الأوضة تاني بالكود.",
   backHome: "ارجع للرئيسية",
   noServer: "السيرفر مش متظبط. لازم تحط VITE_GAME_SERVER_URL في إعدادات Vercel.",
+
+  // home extras
+  howToPlay: "إزاي تلعب؟",
+  rejoin: (code: string) => `ارجع للأوضة ${code}`,
+  howToTitle: "إزاي تلعب قفشة؟",
+  howToSteps: [
+    "واحد يعمل أوضة ويبعت الكود أو الـ QR للشلة (من ٢ لـ ١٠).",
+    "كل واحد يدوس «مستعد»، والهوست يبدأ اللعبة.",
+    "كل لاعب بيجيله ميم مختلف. لو مش عاجبك دوس «غيّر الميم» (عدد مرات محدود).",
+    "اكتب في مربعات النص: اسحبها، كبّرها، لفّها، غيّر ألوانها، أو ارسم عليها ✏️ أو اقص الصورة ✂️.",
+    "لو الوقت خلص قبل ما تبعت، اللي عملته بيتبعت لوحده.",
+    "بعدين الكل يقيّم ميمز بعض: من ⭐ لـ ⭐⭐⭐⭐⭐ (كل نجمة بنقطة)، أو 😡 (−٢ لصاحب الميم).",
+    "💡 التلميح بالذكاء الاصطناعي بيخصم ١٠ نقط. اللي يجمع أكتر نقط في الآخر يكسب 🏆",
+  ],
+  gotIt: "فهمت، يلا بينا",
+
+  // lobby extras
+  ready: "مستعد ✋",
+  notReady: "لسه مش مستعد",
+  readyBadge: "مستعد",
+  readyCount: (n: number, total: number) => `${n} من ${total} مستعدين`,
+  needReady: "مستنيين الكل يدوس «مستعد».",
+  tapReady: "دوس «مستعد» لما تبقى جاهز.",
+  makeHost: "خليه هوست",
+  makeHostConfirm: (name: string) => `تدّي إدارة الأوضة لـ ${name}؟ مش هترجعلك غير لو هو ادّاهالك.`,
+  yes: "آه",
+  no: "لأ",
+  qr: "QR للأوضة",
+  qrTitle: "صوّر الكود بموبايلك عشان تدخل",
+  rerollsSetting: "مرات تغيير الميم في الجولة",
+  blindSetting: "مين عمل الميم وقت التصويت",
+  blindOn: "مخفي",
+  blindOff: "باين",
+
+  // in-game extras
+  myRank: (rank: number, total: number) => `#${rank} من ${total}`,
+  myScore: (n: number) => `${n} نقطة`,
+  rerollBtn: (n: number) => `🔄 غيّر الميم (باقي ${n})`,
+  noRerolls: "خلصت مرات تغيير الميم",
+  doneProgress: (n: number, total: number) => `${n} من ${total} خلّصوا`,
+  autoSubmitNote: "لو الوقت خلص، اللي عملته هيتبعت لوحده.",
+  lateJoin: "دخلت في نص الجولة — استنى، هتلعب من الجولة الجاية.",
+  by: (name: string) => `عمله ${name}`,
+
+  // editor extras
+  rotate: "لف",
+  rotateLeft: "لف شمال",
+  rotateRight: "لف يمين",
+  outline: "حدود للحروف",
+  crop: "قص",
+  cropApply: "تمام",
+  cropReset: "رجّع الأصل",
+  cropHint: "اسحب المستطيل، وغيّر حجمه من الركن.",
+  strip: "تعليق برّه الصورة",
+  stripTop: "فوق",
+  stripBottom: "تحت",
+  stripPlaceholder: "تعليق فوق أو تحت الصورة",
+  stripRemove: "شيل التعليق",
+
+  // download & report
+  download: "نزّل",
+  downloadFail: "مقدرناش نجهّز الصورة، جرّب تاني.",
+  report: "بلّغ",
+  reportTitle: "متأكد إنك عاوز تبلّغ عن الميم ده؟",
+  reportText: "هيفتحلك Gmail برسالة جاهزة، تقدر تعدّل فيها قبل ما تبعت.",
+  reportYes: "آه، بلّغ",
+  reportSubject: (code: string) => `بلاغ عن ميم في لعبة قفشة — أوضة ${code}`,
+  reportBody: (p: { code: string; round: number; text: string; image: string; reporter: string }) =>
+    `السلام عليكم،\n\nعاوز أبلّغ عن ميم في لعبة قفشة شايف إنه مسيء أو مش لائق.\n\nكود الأوضة: ${p.code}\nالجولة: ${p.round}\nالنص اللي على الميم: ${p.text || "(رسم من غير نص)"}\nصورة الميم: ${p.image}\nاللي بيبلّغ: ${p.reporter}\n\nالسبب: (اكتب السبب هنا)\n`,
+
+  // chat
+  chatTitle: "شات الأوضة",
+  chatPlaceholder: "اكتب رسالة…",
+  chatSend: "ابعت",
+  chatEmpty: "محدش كتب حاجة لسه. ابدأ انت 👋",
+  chatOpen: "الشات",
 };
 
-export const errorText: Record<ErrorCode | "NETWORK", string> = {
+export type Dict = typeof ar;
+
+export const arErrors: Record<ErrorCode | "NETWORK", string> = {
   ROOM_NOT_FOUND: "مفيش أوضة بالكود ده. اتأكد من الأرقام.",
   ROOM_FULL: "الأوضة كاملة، فيها ١٠ لاعيبة.",
   GAME_STARTED: "اللعبة بدأت خلاص. ادخل لما يرجعوا للوبي.",
@@ -173,5 +256,9 @@ export const errorText: Record<ErrorCode | "NETWORK", string> = {
   BAD_REQUEST: "حصلت مشكلة. جرّب تاني.",
   CODE_IN_USE: "حصلت مشكلة. جرّب تاني.",
   SERVER_ERROR: "حصلت مشكلة في السيرفر. جرّب تاني.",
-  NETWORK: "مش قادرين نوصل للسيرفر. اتأكد من النت وجرّب تاني.",
+  NETWORK: "مش قادرين نوصل للسيرفر حتى بعد كذا محاولة. اتأكد من النت أو جرّب بعد دقيقة.",
+  NO_REROLLS: "خلصت مرات تغيير الميم في الجولة دي.",
+  NOT_READY: "لسه فيه لاعيبة مش مستعدين.",
+  CHAT_TOO_FAST: "براحة شوية على الشات 😅",
+  INVALID_TARGET: "اللاعب ده مش متصل دلوقتي.",
 };

@@ -20,7 +20,7 @@ export const GAME_CONFIG = {
   roundResultsSeconds: 10,
 
   /** A disconnected player is removed from the LOBBY after this many seconds. */
-  lobbyDisconnectGraceSeconds: 30,
+  lobbyDisconnectGraceSeconds: 120,
   /** If the host is disconnected this long, host rights move to another player. */
   hostDisconnectGraceSeconds: 15,
   /** A room with nobody connected is destroyed after this many seconds. */
@@ -34,11 +34,19 @@ export const GAME_CONFIG = {
   angryPenalty: 2,
   /** Max length of a voting comment. */
   commentMaxLength: 80,
+  /** Chat: max length and min gap between messages from one player. */
+  chatMaxLength: 200,
+  chatMinIntervalMs: 600,
+  chatHistory: 60,
+  /** Players who joined but never connected are dropped after this many seconds. */
+  neverConnectedTtlSeconds: 60,
 } as const;
 
 export const ROUND_OPTIONS = [3, 5, 7, 10] as const;
 export const CAPTION_SECONDS_OPTIONS = [30, 60, 90, 120, 180] as const;
 export const VOTING_SECONDS_OPTIONS = [20, 30, 45, 60, 90] as const;
+/** How many times a player may swap their meme template per round. */
+export const REROLL_OPTIONS = [3, 5, 7, 10] as const;
 
 export interface GameSettings {
   rounds: number;
@@ -46,6 +54,10 @@ export interface GameSettings {
   votingSeconds: number;
   /** null = all categories. Ready for a future category picker. */
   categories: string[] | null;
+  /** Template swaps allowed per player per round. */
+  rerolls: number;
+  /** Blind voting: hide who made each meme until the results. */
+  anonymous: boolean;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -53,4 +65,6 @@ export const DEFAULT_SETTINGS: GameSettings = {
   captionSeconds: 90,
   votingSeconds: 45, // rating every meme with stars takes a bit longer
   categories: null,
+  rerolls: 3,
+  anonymous: true,
 };

@@ -64,6 +64,7 @@ export function scoreRound(
       playerId: s.playerId,
       playerName: player?.name ?? "؟",
       avatar: player?.avatar ?? ({} as RoundEntry["avatar"]),
+      template: s.template,
       design: s.design,
       stars: got.reduce((a, r) => a + (r.angry ? 0 : r.stars), 0),
       raters: got.filter((r) => !r.angry).length,

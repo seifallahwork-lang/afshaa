@@ -49,8 +49,15 @@ async function listChildren(folderId: string, apiKey: string, fetchFn: Fetch): P
   return files;
 }
 
-/** Public image URL for a Drive file (works for "anyone with the link" files). */
-export const driveImageUrl = (fileId: string) => `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`;
+/** Google's own thumbnail URL for a public Drive file. */
+export const driveThumbUrl = (fileId: string, width = 1200) => `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`;
+
+/**
+ * Images are served through our own Worker (/api/img/<id>) instead of straight
+ * from Drive: Cloudflare caches them near the players (faster), and the
+ * browser is allowed to draw them on a canvas (needed for "Download meme").
+ */
+export const driveImageUrl = (fileId: string) => `/api/img/${fileId}`;
 
 /** "top - الواد بيبص.jpg" → { name: "الواد بيبص", position: "top" } */
 export function parseFileName(fileName: string): { name: string; position: "top" | "bottom" } {

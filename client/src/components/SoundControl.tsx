@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { t } from "../i18n/ar";
+import { t } from "../i18n";
 import { sound } from "../lib/sound";
 
 /** 🎵 button → small panel: music on/off, volume, sound effects on/off. */
-export function SoundControl({ className = "" }: { className?: string }) {
+export function SoundControl({ className = "", variant = "icon" }: { className?: string; variant?: "icon" | "pill" }) {
   const [, force] = useState(0);
   const [open, setOpen] = useState(false);
   useEffect(() => sound.subscribe(() => force((n) => n + 1)), []);
@@ -13,12 +13,13 @@ export function SoundControl({ className = "" }: { className?: string }) {
     <div className={`sound-control ${className}`}>
       <button
         type="button"
-        className="icon-btn"
+        className={variant === "pill" ? "pill-btn" : "icon-btn"}
         aria-expanded={open}
         aria-label={t.soundSettings}
         onClick={() => setOpen((o) => !o)}
       >
         {s.musicOn && s.volume > 0 ? "🎵" : "🔇"}
+        {variant === "pill" && ` ${t.soundSettings}`}
       </button>
       {open && (
         <div className="sound-panel" role="dialog" aria-label={t.soundSettings}>

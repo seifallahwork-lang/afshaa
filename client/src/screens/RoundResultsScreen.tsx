@@ -1,11 +1,12 @@
 import { GAME_CONFIG } from "@shared/config";
 import { useEffect } from "react";
 import { Avatar } from "../components/Avatar";
+import { DownloadButton, ReportButton } from "../components/MemeActions";
 import { MemeView } from "../components/MemeView";
 import { Leaderboard, MEDALS } from "../components/game";
 import { Button, Panel } from "../components/ui";
 import { useCountdown } from "../hooks/useCountdown";
-import { t } from "../i18n/ar";
+import { t } from "../i18n";
 import { sound } from "../lib/sound";
 import type { ScreenProps } from "./types";
 
@@ -29,7 +30,19 @@ export function RoundResultsScreen({ state, send, clockOffset }: ScreenProps) {
 
       {result && top && hasWinner ? (
         <div className="winner-meme">
-          <MemeView template={result.template} design={top.design} className="meme-hero" />
+          <MemeView template={top.template} design={top.design} className="meme-hero" />
+          <div className="meme-actions row-center">
+            <DownloadButton template={top.template} design={top.design} name={`afsha-${state.code}-r${state.round}`} />
+            {top.playerId !== state.you.id && (
+              <ReportButton
+                template={top.template}
+                design={top.design}
+                code={state.code}
+                round={state.round}
+                reporter={state.players.find((p) => p.id === state.you.id)?.name ?? ""}
+              />
+            )}
+          </div>
           <p className="winner-line">
             🏆{" "}
             {result.entries
@@ -52,7 +65,7 @@ export function RoundResultsScreen({ state, send, clockOffset }: ScreenProps) {
               <li key={e.submissionId}>
                 <div className="entry-head">
                   <span className="lb-rank">{e.points > 0 ? (MEDALS[i] ?? i + 1) : "·"}</span>
-                  <Avatar avatar={e.avatar} size={36} />
+                  <Avatar avatar={e.avatar} size={46} />
                   <strong className="entry-name">{e.playerName}</strong>
                   <span className="entry-stats">
                     ⭐ {e.stars}

@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { Avatar } from "./Avatar";
 import { SoundControl } from "./SoundControl";
 import { sound } from "../lib/sound";
-import { t } from "../i18n/ar";
+import { t } from "../i18n";
 import type { ConnectionStatus } from "../hooks/useRoom";
 import { useCountdown } from "../hooks/useCountdown";
 import { Logo } from "./ui";
@@ -45,7 +45,36 @@ export function TopBar({ state, status }: { state: RoomView; status: ConnectionS
         <span className={`dot ${status === "open" ? "dot-on" : "dot-off"}`} title={status} />
         <SoundControl />
       </div>
+      <MyStatus state={state} />
     </header>
+  );
+}
+
+/** "#2 من 6 — 15 نقطة": every player always sees their own rank and score. */
+export function MyStatus({ state }: { state: RoomView }) {
+  if (state.phase === "LOBBY") return null;
+  const ranked = rankPlayers(state.players.filter((p) => !p.left));
+  const me = ranked.find((p) => p.id === state.you.id);
+  if (!me) return null;
+  return (
+    <div className="my-status" aria-live="polite">
+      <span className="chip chip-rank">🏅 {t.myRank(me.rank, ranked.length)}</span>
+      <span className="chip chip-score">⭐ {t.myScore(me.score)}</span>
+    </div>
+  );
+}
+
+/** "3 من 6 خلّصوا" with a small bar. */
+export function DoneProgress({ players, done }: { players: PlayerView[]; done: (p: PlayerView) => boolean }) {
+  const active = players.filter((p) => !p.left && p.connected);
+  const n = active.filter(done).length;
+  return (
+    <div className="done-progress" role="status">
+      <span>✅ {t.doneProgress(n, active.length)}</span>
+      <span className="done-bar">
+        <i style={{ width: `${active.length ? (n / active.length) * 100 : 0}%` }} />
+      </span>
+    </div>
   );
 }
 
@@ -58,16 +87,32 @@ export function ConnectionBanner({ status }: { status: ConnectionStatus }) {
   );
 }
 
-export function PlayerList({ players, youId }: { players: PlayerView[]; youId: string }) {
+export function PlayerList({
+  players,
+  youId,
+  showReady = false,
+  onMakeHost,
+}: {
+  players: PlayerView[];
+  youId: string;
+  showReady?: boolean;
+  onMakeHost?: (p: PlayerView) => void;
+}) {
   return (
     <ul className="players">
       {players.map((p) => (
-        <li key={p.id} className={`player ${p.connected ? "" : "is-off"}`}>
-          <Avatar avatar={p.avatar} size={44} />
+        <li key={p.id} className={`player ${p.connected ? "" : "is-off"} ${showReady && p.ready ? "is-ready" : ""}`}>
+          <Avatar avatar={p.avatar} size={58} />
           <span className="player-name">{p.name}</span>
           {p.isHost && <span className="tag tag-host">👑 {t.hostBadge}</span>}
           {p.id === youId && <span className="tag">{t.you}</span>}
+          {showReady && !p.isHost && <span className={`tag ${p.ready ? "tag-ready" : "tag-off"}`}>{p.ready ? `✔ ${t.readyBadge}` : "…"}</span>}
           {!p.connected && <span className="tag tag-off">{t.offline}</span>}
+          {onMakeHost && !p.isHost && p.connected && (
+            <button type="button" className="mini-btn" onClick={() => onMakeHost(p)}>
+              👑 {t.makeHost}
+            </button>
+          )}
         </li>
       ))}
     </ul>
@@ -82,7 +127,7 @@ export function ProgressChips({ players, done }: { players: PlayerView[]; done: 
         .filter((p) => !p.left)
         .map((p) => (
           <li key={p.id} className={done(p) ? "done" : p.connected ? "" : "off"}>
-            <Avatar avatar={p.avatar} size={22} />
+            <Avatar avatar={p.avatar} size={30} />
             {done(p) ? "✔ " : ""}
             {p.name}
           </li>
@@ -110,7 +155,7 @@ export function Leaderboard({ players, youId }: { players: PlayerView[]; youId: 
       {rankPlayers(players).map((p) => (
         <li key={p.id} className={p.id === youId ? "is-you" : ""}>
           <span className="lb-rank">{MEDALS[p.rank - 1] ?? p.rank}</span>
-          <Avatar avatar={p.avatar} size={34} />
+          <Avatar avatar={p.avatar} size={46} />
           <span className="lb-name">
             {p.name}
             {p.left && <small> ({t.left})</small>}

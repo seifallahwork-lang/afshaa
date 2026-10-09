@@ -24,8 +24,20 @@ export function loadSession(): SessionResponse | null {
   }, null);
 }
 
+const LAST_KEY = "afsha.last";
+
+/** Last room on this device (survives closing the browser) → "ارجع للأوضة" button. */
+export function loadLastSession(): SessionResponse | null {
+  return safe(() => {
+    const raw = localStorage.getItem(LAST_KEY);
+    return raw ? (JSON.parse(raw) as SessionResponse) : null;
+  }, null);
+}
+export const forgetLastSession = () => safe(() => localStorage.removeItem(LAST_KEY), undefined);
+
 export function saveSession(s: SessionResponse): void {
   safe(() => sessionStorage.setItem(KEY, JSON.stringify(s)), undefined);
+  safe(() => localStorage.setItem(LAST_KEY, JSON.stringify(s)), undefined);
   const url = new URL(location.href);
   url.searchParams.set("room", s.code);
   history.replaceState(null, "", url);

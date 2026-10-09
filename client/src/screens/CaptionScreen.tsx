@@ -1,14 +1,18 @@
 import { GAME_CONFIG } from "@shared/config";
 import { isDesignEmpty, type MemeDesign } from "@shared/design";
-import { useState } from "react";
+import type { MemeTemplate } from "@shared/templates";
+import { useEffect, useRef, useState } from "react";
 import { MemeEditor, newBox } from "../components/MemeEditor";
+import { DownloadButton } from "../components/MemeActions";
 import { MemeView } from "../components/MemeView";
-import { ProgressChips, Timer } from "../components/game";
+import { DoneProgress, ProgressChips, Timer } from "../components/game";
 import { Button } from "../components/ui";
 import { useCountdown } from "../hooks/useCountdown";
-import { t } from "../i18n/ar";
+import { t } from "../i18n";
 import { sound } from "../lib/sound";
 import type { ScreenProps } from "./types";
+
+const DRAFT_EVERY_MS = 2500;
 
 function HintBox({ state, send }: Pick<ScreenProps, "state" | "send">) {
   const [confirming, setConfirming] = useState(false);
@@ -42,24 +46,64 @@ function HintBox({ state, send }: Pick<ScreenProps, "state" | "send">) {
       </div>
     </div>
   ) : (
-    <button type="button" className="hint-btn" onClick={() => setConfirming(true)}>
+    <button type="button" className="pill-btn hint-btn" onClick={() => setConfirming(true)}>
       💡 {t.hintButton} <small>(−{GAME_CONFIG.hintCost})</small>
     </button>
   );
 }
 
+const freshDesign = (template: MemeTemplate | null): MemeDesign => ({
+  boxes: [newBox(template?.captionPosition ?? "bottom")],
+  strokes: [],
+  crop: null,
+  strip: null,
+});
+
 export function CaptionScreen({ state, send, clockOffset }: ScreenProps) {
-  const [design, setDesign] = useState<MemeDesign>(() => ({
-    boxes: [newBox(state.template?.captionPosition ?? "bottom")],
-    strokes: [],
-  }));
+  const template = state.you.template;
+  const [design, setDesign] = useState<MemeDesign>(() => state.you.draft ?? freshDesign(template));
   const left = useCountdown(state.phaseEndsAt, clockOffset);
   const submitted = state.you.myDesign !== null;
-  const active = state.players.filter((p) => !p.left);
-  const doneCount = active.filter((p) => p.hasSubmitted).length;
   const empty = isDesignEmpty(design);
 
-  if (!state.template) return null;
+  // New meme (reroll) → start fresh on the new picture (reset during render, before the editor mounts).
+  const [shownId, setShownId] = useState(template?.id);
+  if (template && template.id !== shownId) {
+    setShownId(template.id);
+    setDesign(freshDesign(template));
+  }
+
+  // Autosave to the server so unfinished work is submitted when time runs out.
+  const lastSent = useRef("");
+  useEffect(() => {
+    if (submitted) return;
+    const id = window.setTimeout(() => {
+      const json = JSON.stringify(design);
+      if (json !== lastSent.current && !isDesignEmpty(design)) {
+        lastSent.current = json;
+        send({ type: "draft", design });
+      }
+    }, DRAFT_EVERY_MS);
+    return () => window.clearTimeout(id);
+  }, [design, submitted, send]);
+
+  // Last 2 seconds: push the latest version right away.
+  useEffect(() => {
+    if (left === 2 && !submitted && !isDesignEmpty(design)) send({ type: "draft", design });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [left]);
+
+  if (!template) {
+    return (
+      <div className="stack">
+        <Timer endsAt={state.phaseEndsAt} total={state.settings.captionSeconds} clockOffset={clockOffset} />
+        <div className="panel center">
+          <p className="big-ok">⏳</p>
+          <p>{t.lateJoin}</p>
+        </div>
+      </div>
+    );
+  }
 
   const submit = () => {
     if (empty || left === 0) return;
@@ -69,31 +113,46 @@ export function CaptionScreen({ state, send, clockOffset }: ScreenProps) {
 
   return (
     <div className="stack">
-      <Timer endsAt={state.phaseEndsAt} total={state.settings.captionSeconds} clockOffset={clockOffset} />
+      <div className="timer-row">
+        <Timer endsAt={state.phaseEndsAt} total={state.settings.captionSeconds} clockOffset={clockOffset} />
+        <DoneProgress players={state.players} done={(p) => p.hasSubmitted} />
+      </div>
 
       {submitted ? (
         <>
-          <MemeView template={state.template} design={state.you.myDesign} className="meme-hero" />
+          <MemeView template={template} design={state.you.myDesign} className="meme-hero" />
           <div className="panel center">
             <p className="big-ok">{t.submitted}</p>
             <p className="hint">{t.waitingOthers}</p>
+            <div className="row-center">
+              <DownloadButton template={template} design={state.you.myDesign!} />
+            </div>
           </div>
         </>
       ) : (
         <>
-          <HintBox state={state} send={send} />
-          <MemeEditor template={state.template} design={design} onChange={setDesign} disabled={left === 0} />
+          <div className="caption-actions">
+            <button
+              type="button"
+              className="pill-btn"
+              disabled={state.you.rerollsLeft <= 0 || left === 0}
+              onClick={() => send({ type: "reroll" })}
+            >
+              {state.you.rerollsLeft > 0 ? t.rerollBtn(state.you.rerollsLeft) : t.noRerolls}
+            </button>
+            <HintBox state={state} send={send} />
+          </div>
+          <MemeEditor key={template.id} template={template} design={design} onChange={setDesign} disabled={left === 0} />
           <div className="submit-bar">
             <Button className="btn-big" onClick={submit} disabled={empty || left === 0}>
               {left === 0 ? t.timeUp : t.submitMeme}
             </Button>
-            {empty && left > 0 && <p className="hint">{t.emptyMeme}</p>}
+            <p className="hint">{empty && left > 0 ? t.emptyMeme : t.autoSubmitNote}</p>
           </div>
         </>
       )}
 
       <div className="panel">
-        <p className="panel-sub">{t.submittedCount(doneCount, active.length)}</p>
         <ProgressChips players={state.players} done={(p) => p.hasSubmitted} />
       </div>
     </div>

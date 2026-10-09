@@ -32,10 +32,10 @@ function toBase64(buf: ArrayBuffer): string {
   return btoa(bin);
 }
 
-/** Smaller Drive thumbnail = faster + cheaper for the model. */
-function imageUrlForAi(image: string): string | null {
-  if (!/^https?:\/\//.test(image)) return null; // built-in placeholder SVGs aren't sent to the AI
-  return image.replace(/([?&]sz=)w\d+/, "$1w768");
+/** Drive templates (id "gd_<fileId>") → a smaller thumbnail = faster + cheaper for the model. */
+function imageUrlForAi(template: MemeTemplate): string | null {
+  if (!template.id.startsWith("gd_")) return null; // built-in placeholder SVGs aren't sent to the AI
+  return `https://drive.google.com/thumbnail?id=${template.id.slice(3)}&sz=w768`;
 }
 
 function extractText(res: unknown): string {
@@ -53,7 +53,7 @@ export class HintUnavailable extends Error {}
 
 export async function generateHint(ai: AiBinding | undefined, template: MemeTemplate, fetchFn: typeof fetch = fetch): Promise<string> {
   if (!ai) throw new HintUnavailable("Workers AI binding missing");
-  const url = imageUrlForAi(template.image);
+  const url = imageUrlForAi(template);
   if (!url) throw new HintUnavailable("Template image is not a web URL");
 
   const img = await fetchFn(url, { redirect: "follow" });

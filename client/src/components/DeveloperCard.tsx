@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DEVELOPER } from "../config/developer";
-import { t } from "../i18n/ar";
+import { t } from "../i18n";
 
 /** Small button at the bottom-left → card with the developer's contacts. */
 export function DeveloperButton({ inline = false }: { inline?: boolean }) {

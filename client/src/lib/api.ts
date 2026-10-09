@@ -8,21 +8,52 @@ export class ApiFailure extends Error {
   }
 }
 
-async function post(path: string, body: unknown): Promise<SessionResponse> {
-  if (!SERVER_URL) throw new ApiFailure("NETWORK");
-  let res: Response;
+const RETRY_DELAYS = [600, 1500, 3000];
+
+async function once(path: string, body: unknown): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), 10_000);
   try {
-    res = await fetch(`${SERVER_URL}${path}`, {
+    return await fetch(`${SERVER_URL}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: ctrl.signal,
     });
-  } catch {
-    throw new ApiFailure("NETWORK");
+  } finally {
+    window.clearTimeout(timer);
   }
-  const data = (await res.json().catch(() => ({ error: "SERVER_ERROR" }))) as SessionResponse | ApiError;
-  if (!res.ok || "error" in data) throw new ApiFailure("error" in data ? data.error : "SERVER_ERROR");
-  return data;
+}
+
+/**
+ * POST with automatic retries: a dropped request, a timeout or a temporary
+ * server error (5xx) is retried up to 3 times before showing an error.
+ */
+async function post(path: string, body: unknown): Promise<SessionResponse> {
+  if (!SERVER_URL) throw new ApiFailure("NETWORK");
+  let lastError: ApiFailure = new ApiFailure("NETWORK");
+  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt - 1]));
+    let res: Response;
+    try {
+      res = await once(path, body);
+    } catch {
+      lastError = new ApiFailure("NETWORK");
+      continue;
+    }
+    const data = (await res.json().catch(() => ({ error: "SERVER_ERROR" }))) as SessionResponse | ApiError;
+    if (res.ok && !("error" in data)) return data;
+    const code = "error" in data ? data.error : "SERVER_ERROR";
+    lastError = new ApiFailure(code);
+    if (res.status < 500) throw lastError; // a real answer (room full, wrong code…) — don't retry
+  }
+  throw lastError;
+}
+
+/** Wake the server up as soon as the page opens, so "Create game" is instant. */
+export function warmUp(): void {
+  if (!SERVER_URL) return;
+  fetch(`${SERVER_URL}/api/health`, { cache: "no-store" }).catch(() => undefined);
 }
 
 export const createRoom = (name: string, avatar: Avatar) => post("/api/rooms", { name, avatar });

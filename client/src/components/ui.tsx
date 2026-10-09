@@ -1,6 +1,6 @@
 /** Small reusable building blocks. */
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { t } from "../i18n/ar";
+import { t } from "../i18n";
 
 type Variant = "primary" | "secondary" | "ghost";
 

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useCountdown } from "../hooks/useCountdown";
 import { sound } from "../lib/sound";
-import { t } from "../i18n/ar";
+import { t } from "../i18n";
 import type { ScreenProps } from "./types";
 
 export function CountdownScreen({ state, clockOffset }: ScreenProps) {

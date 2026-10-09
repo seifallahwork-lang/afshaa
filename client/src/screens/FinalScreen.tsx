@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { Avatar } from "../components/Avatar";
+import { DownloadButton } from "../components/MemeActions";
 import { MemeView } from "../components/MemeView";
 import { Leaderboard, rankPlayers } from "../components/game";
 import { Button, Panel } from "../components/ui";
-import { t } from "../i18n/ar";
+import { t } from "../i18n";
 import { sound } from "../lib/sound";
 import type { ScreenProps } from "./types";
 
@@ -26,7 +27,7 @@ export function FinalScreen({ state, send, onLeave }: ScreenProps) {
           <>
             <div className="winner-avatars">
               {winners.map((w) => (
-                <Avatar key={w.id} avatar={w.avatar} size={112} />
+                <Avatar key={w.id} avatar={w.avatar} size={150} />
               ))}
             </div>
             <h1 className="trophy-name">{winners.map((w) => w.name).join(" و ")}</h1>
@@ -54,6 +55,9 @@ export function FinalScreen({ state, send, onLeave }: ScreenProps) {
                 <figcaption>
                   {t.roundOf(h.round, state.totalRounds)}: <strong>{h.playerName}</strong> ({t.points(h.points)})
                 </figcaption>
+                <div className="row-center">
+                  <DownloadButton template={h.template} design={h.design} name={`afsha-best-${h.round}`} />
+                </div>
               </figure>
             ))}
           </div>

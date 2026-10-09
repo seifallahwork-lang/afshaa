@@ -94,6 +94,8 @@ async function createRoom(hostName, n) {
     players.push(new Player(`لاعب${i}`, r.data));
   }
   await Promise.all(players.map((p) => p.connect()));
+  for (const p of players.slice(1)) p.send({ type: "ready", ready: true });
+  await sleep(150);
   return { code: host.data.code, players, hostRes: host };
 }
 
@@ -148,6 +150,24 @@ async function main() {
   await lateP.connect();
   const all = [host, p1, p2, lateP];
 
+  host.send({ type: "start" });
+  await until(() => host.errors.includes("NOT_READY"), "not ready");
+  check("host can't start until everyone is ready", host.errors.includes("NOT_READY"));
+  lateP.send({ type: "ready", ready: true });
+  await until(() => host.state.players.every((p) => p.ready), "all ready");
+
+  // Chat
+  p1.send({ type: "chat", text: "يلا بينا 😂" });
+  await until(() => host.state.chat.some((m) => m.text === "يلا بينا 😂"), "chat");
+  check("chat message reaches everyone with the sender's name", host.state.chat.at(-1)?.name === p1.name);
+
+  // Host transfer and back
+  host.send({ type: "transferHost", playerId: p1.id });
+  await until(() => p1.state.you.isHost, "transfer");
+  check("host can hand the room to another player", p1.state.you.isHost && !host.state.you.isHost);
+  p1.send({ type: "transferHost", playerId: host.id });
+  await until(() => host.state.you.isHost, "transfer back");
+
   p1.send({ type: "start" });
   await until(() => p1.errors.includes("NOT_HOST"), "NOT_HOST");
   check("non-host cannot start", p1.errors.includes("NOT_HOST"));
@@ -155,11 +175,20 @@ async function main() {
   host.send({ type: "start" });
   await until(() => all.every((p) => p.state.phase === "COUNTDOWN"), "COUNTDOWN");
   check("host start moves everyone to the game", all.every((p) => p.state.phase === "COUNTDOWN"));
-  const afterStart = await api(`/api/rooms/${g.code}/join`, { name: "متأخر" });
-  check("join after start → GAME_STARTED", afterStart.data.error === "GAME_STARTED");
+  const afterStart = await api(`/api/rooms/${g.code}/join`, { name: "متأخر", avatar: AVATAR });
+  check("joining after the game started is allowed", afterStart.status === 200);
+  const mid = new Player("متأخر", afterStart.data);
+  await mid.connect();
+  check("mid-game joiner gets their own meme", Boolean(mid.state.you.template || mid.state.phase === "COUNTDOWN"));
+  mid.send({ type: "leave" });
 
   await until(() => all.every((p) => p.state.phase === "CAPTION"), "CAPTION");
-  check("caption phase has a meme template", Boolean(host.state.template?.image));
+  check("each player has a meme template", all.every((p) => p.state.you.template?.image));
+  check("players get different memes", new Set(all.map((p) => p.state.you.template.id)).size === all.length);
+  const before = p2.state.you.template.id;
+  p2.send({ type: "reroll" });
+  await until(() => p2.state.you.template.id !== before, "reroll");
+  check("reroll swaps my meme and counts down", p2.state.you.template.id !== before && p2.state.you.rerollsLeft === 2);
   const msgsBefore = p1.log.length;
   host.send({ type: "submitMeme", design: meme("سر_الكابشن_السري 🤫") });
   await until(() => p1.state.players.find((p) => p.id === host.id)?.hasSubmitted, "submitted flag");
@@ -213,7 +242,7 @@ async function main() {
   const pointsSum = entries.reduce((a, e) => a + e.points, 0);
   const starsSum = entries.reduce((a, e) => a + e.stars, 0);
   check("points = stars − 2 per 😡", pointsSum === starsSum - 2, `${pointsSum} vs ${starsSum}`);
-  check("avatars travel with players", JSON.stringify(host.state.players[0].avatar) === JSON.stringify(AVATAR));
+  check("avatars travel with players", Object.entries(AVATAR).every(([k, v]) => host.state.players[0].avatar[k] === v));
 
   // Refresh: reconnect with the same token keeps the seat and score.
   const scoreBefore = host.state.players.find((p) => p.id === lateP.id).score;
@@ -250,9 +279,11 @@ async function main() {
   t.players[0].send({ type: "start" });
   await until(() => t.players[0].state.phase === "CAPTION", "caption");
   t.players[0].send({ type: "submitMeme", design: meme("أنا بس اللي كتبت") });
+  t.players[1].send({ type: "draft", design: meme("لسه بكتب…") });
   const endsAt = t.players[0].state.phaseEndsAt;
   await until(() => t.players.every((p) => p.state.phase === "REVEAL"), "timer expiry", 40000);
   check("timer expiry closes captions (server-side)", t.players[1].state.phase === "REVEAL" && Date.now() >= endsAt - 1500);
+  check("unfinished work was submitted automatically", t.players[1].state.submissions.length === 2);
   t.players[1].send({ type: "submitMeme", design: meme("متأخر") });
   await until(() => t.players[1].errors.includes("WRONG_PHASE"), "late");
   check("late submission rejected", t.players[1].errors.includes("WRONG_PHASE"));
