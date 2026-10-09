@@ -143,6 +143,25 @@ export const ar = {
   reconnecting: "النت فصل، بنحاول نرجّعك…",
   endedExpired: "الأوضة دي اتقفلت.",
   endedToken: "الجلسة دي خلصت. ادخل الأوضة تاني بالكود.",
+  endedKicked: "اللاعيبة أخدوا قرار إزالة، فطلعت من الأوضة.",
+
+  // removal vote
+  kickTitle: "قرار إزالة",
+  kickConfirm: (name: string) => `متأكد إنك عاوز تبعت قرار إزالة للاعب «${name}»؟`,
+  kickNote: "قرارك سري، محدش هيعرف إنك بعته. اللاعب بيخرج بس لو كل اللاعيبة التانيين بعتوا نفس القرار.",
+  kickSend: "ابعت قرار الإزالة",
+  kickSent: (name: string) => `انت بعت قرار إزالة لـ «${name}» ✔`,
+  kickWithdraw: "اسحب القرار",
+  tapToKick: "دوس على أي لاعب عشان تبعت «قرار إزالة».",
+
+  // leaving / switching rooms
+  exitMenu: "خروج",
+  exitTitle: "عاوز تعمل إيه؟",
+  jumpRoom: "🔀 نط في أوضة تانية",
+  jumpCodeLabel: "كود الأوضة التانية",
+  jumpGo: "يلا نط",
+  imLeaving: "👋 أنا ماشي",
+  goHome: "الصفحة الرئيسية",
   backHome: "ارجع للرئيسية",
   noServer: "السيرفر مش متظبط. لازم تحط VITE_GAME_SERVER_URL في إعدادات Vercel.",
 

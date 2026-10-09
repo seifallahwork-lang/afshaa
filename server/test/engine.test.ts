@@ -18,6 +18,7 @@ import {
   chat,
   tick,
   updateSettings,
+  voteKick,
 } from "../src/game/engine";
 import { GameError } from "../src/game/errors";
 import type { RoomState } from "../src/game/types";
@@ -433,5 +434,36 @@ describe("disconnects, host migration, expiry", () => {
     const lobby = room(1);
     markDisconnected(lobby.s, lobby.ids[0], T0);
     expect(tick(lobby.s, T0 + (GAME_CONFIG.lobbyDisconnectGraceSeconds + 1) * S)).toBe(true);
+  });
+});
+
+describe("removal vote (قرار إزالة)", () => {
+  it("is secret, can be taken back, and removes a player only when everyone else agrees", () => {
+    const { s, ids } = room(4);
+    const [a, b, c, d] = ids;
+    expectError(() => voteKick(s, a, a, true, T0), "INVALID_TARGET");
+    voteKick(s, a, d, true, T0);
+    voteKick(s, b, d, true, T0);
+    expect(buildView(s, a).you.kickVotes).toEqual([d]);
+    expect(buildView(s, c).you.kickVotes).toEqual([]); // nobody else can see who voted
+    expect(JSON.stringify(buildView(s, d))).not.toContain(a + '"]'); // target sees no voter ids
+    voteKick(s, b, d, false, T0); // b takes it back
+    voteKick(s, c, d, true, T0);
+    expect(s.players.some((p) => p.id === d)).toBe(true);
+    voteKick(s, b, d, true, T0); // now a, b, c all agree
+    expect(s.players.some((p) => p.id === d)).toBe(false);
+    expect(s.kicked).toContain(d);
+  });
+
+  it("counts only connected players, and works mid-game (score kept, seat closed)", () => {
+    const { s, ids } = room(3);
+    const [a, b, c] = ids;
+    startGame(s, a, T0);
+    voteKick(s, a, c, true, T0 + S);
+    markDisconnected(s, b, T0 + S);
+    tick(s, T0 + 2 * S); // b is away, so a alone is "everyone else"
+    const kicked = s.players.find((p) => p.id === c)!;
+    expect(kicked.left).toBe(true);
+    expect(kicked.token.startsWith("kicked-")).toBe(true);
   });
 });

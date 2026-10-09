@@ -26,6 +26,7 @@ import {
   saveDraft,
   setReady,
   transferHost,
+  voteKick,
   returnToLobby,
   skip,
   startGame,
@@ -54,7 +55,7 @@ export class GameRoom extends DurableObject<Env> {
     ctx.blockConcurrencyWhile(async () => {
       const saved = (await ctx.storage.get<RoomState>(STATE_KEY)) ?? null;
       // Rooms saved by an older version of the game are discarded (rooms are temporary anyway).
-      this.state = saved && saved.version === 5 ? saved : null;
+      this.state = saved && saved.version === 6 ? saved : null;
     });
     // Heartbeats are answered by Cloudflare without waking the room.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
@@ -180,6 +181,9 @@ export class GameRoom extends DurableObject<Env> {
         case "transferHost":
           transferHost(s, playerId, msg.playerId);
           break;
+        case "kickVote":
+          voteKick(s, playerId, msg.playerId, msg.vote, now);
+          break;
         case "skip":
           skip(s, playerId, now);
           break;
@@ -266,6 +270,15 @@ export class GameRoom extends DurableObject<Env> {
     if (!s) return;
     for (const ws of this.ctx.getWebSockets()) {
       const { playerId } = (ws.deserializeAttachment() ?? {}) as Partial<Attachment>;
+      if (playerId && s.kicked.includes(playerId)) {
+        try {
+          ws.send(JSON.stringify({ type: "closed", reason: "KICKED" } satisfies ServerMessage));
+        } catch {
+          /* ignore */
+        }
+        this.safeClose(ws, CLOSE_CODES.KICKED, "KICKED");
+        continue;
+      }
       if (!playerId || !findPlayer(s, playerId) || findPlayer(s, playerId)?.left) {
         this.safeClose(ws, CLOSE_CODES.INVALID_TOKEN, "INVALID_TOKEN");
         continue;

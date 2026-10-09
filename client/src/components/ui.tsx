@@ -19,12 +19,18 @@ export function Button({
 }
 
 /** The wordmark: a hand-painted sign with a tuk-tuk fringe. */
-export function Logo({ size = "lg" }: { size?: "lg" | "sm" }) {
+export function Logo({ size = "lg", onClick }: { size?: "lg" | "sm"; onClick?: () => void }) {
   return (
-    <div className={`logo logo-${size}`} aria-label={t.gameName}>
+    <button type="button" className={`logo logo-${size} logo-btn`} aria-label={`${t.gameName} — ${t.goHome}`} title={t.goHome} onClick={onClick ?? goHome}>
       <span className="logo-word">{t.gameName}</span>
-    </div>
+    </button>
   );
+}
+
+/** The home page (also drops any ?room= from the address). */
+export function goHome() {
+  if (location.pathname !== "/" || location.search) location.assign("/");
+  else window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 /** Decorative tent-fabric band (khayamiya-inspired). */

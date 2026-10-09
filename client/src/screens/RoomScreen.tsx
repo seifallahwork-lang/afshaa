@@ -1,7 +1,8 @@
 /** Connects to the room and shows the screen for the current phase. */
-import type { SessionResponse } from "@shared/protocol";
-import { useEffect } from "react";
+import type { PlayerView, SessionResponse } from "@shared/protocol";
+import { useEffect, useState } from "react";
 import { Chat } from "../components/Chat";
+import { ExitSheet, KickSheet, PlayerTapProvider } from "../components/RoomControls";
 import { ConnectionBanner, TopBar } from "../components/game";
 import { Toast } from "../components/Toast";
 import { Fringe } from "../components/ui";
@@ -15,8 +16,25 @@ import { RoundResultsScreen } from "./RoundResultsScreen";
 import type { ScreenProps } from "./types";
 import { VotingScreen } from "./VotingScreen";
 
-export function RoomScreen({ session, onExit }: { session: SessionResponse; onExit: (message?: string) => void }) {
+export function RoomScreen({
+  session,
+  onExit,
+  onHome,
+  onSwitch,
+  onToggleLang,
+}: {
+  session: SessionResponse;
+  onExit: (message?: string) => void;
+  /** Back to the home page, keeping my seat (the "ارجع للأوضة" button brings me back). */
+  onHome: () => void;
+  /** I joined another room: leave this one and go there. */
+  onSwitch: (next: SessionResponse) => void;
+  onToggleLang: () => void;
+}) {
   const { state, status, ended, clockOffset, error, send } = useRoom(session);
+  const [kickTarget, setKickTarget] = useState<PlayerView | null>(null);
+  const [exitOpen, setExitOpen] = useState(false);
+  const [chatDocked, setChatDocked] = useState(false);
 
   // Warm the browser cache with the next meme during the 3-second countdown.
   const preload = state?.preloadImage;
@@ -31,6 +49,7 @@ export function RoomScreen({ session, onExit }: { session: SessionResponse; onEx
     if (ended === "LEFT") onExit();
     else if (ended === "EXPIRED") onExit(t.endedExpired);
     else if (ended === "INVALID_TOKEN") onExit(t.endedToken);
+    else if (ended === "KICKED") onExit(t.endedKicked);
   }, [ended, onExit]);
 
   if (!state) {
@@ -80,14 +99,37 @@ export function RoomScreen({ session, onExit }: { session: SessionResponse; onEx
       break;
   }
 
+  // The player in the sheet may have changed (or left) since it was opened.
+  const kickLive = kickTarget ? state.players.find((p) => p.id === kickTarget.id && !p.left) ?? null : null;
+
   return (
-    <main className={`room phase-${state.phase.toLowerCase()}`}>
-      <Fringe />
-      <TopBar state={state} status={status} />
-      <ConnectionBanner status={status} />
-      <div className="room-body">{screen}</div>
-      <Chat messages={state.chat} youId={state.you.id} send={send} />
-      <Toast message={error ? errorText[error.code] : null} at={error?.at ?? 0} />
-    </main>
+    <PlayerTapProvider value={{ youId: state.you.id, onTap: setKickTarget }}>
+      <main className={`room phase-${state.phase.toLowerCase()} ${chatDocked ? "has-chat-panel" : ""}`}>
+        <Fringe />
+        <TopBar state={state} status={status} onHome={onHome} onExit={() => setExitOpen(true)} onToggleLang={onToggleLang} />
+        <ConnectionBanner status={status} />
+        <div className="room-body">{screen}</div>
+        <Chat messages={state.chat} youId={state.you.id} send={send} onDocked={setChatDocked} />
+        <Toast message={error ? errorText[error.code] : null} at={error?.at ?? 0} />
+      </main>
+      {kickLive && (
+        <KickSheet
+          player={kickLive}
+          voted={state.you.kickVotes.includes(kickLive.id)}
+          onVote={(vote) => send({ type: "kickVote", playerId: kickLive.id, vote })}
+          onClose={() => setKickTarget(null)}
+        />
+      )}
+      {exitOpen && (
+        <ExitSheet
+          onLeave={props.onLeave}
+          onJump={(next) => {
+            send({ type: "leave" });
+            onSwitch(next);
+          }}
+          onClose={() => setExitOpen(false)}
+        />
+      )}
+    </PlayerTapProvider>
   );
 }

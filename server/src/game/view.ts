@@ -66,6 +66,7 @@ export function buildView(s: RoomState, viewerId: string): RoomView {
       draft: s.drafts[viewerId] ?? null,
       myDesign: mine?.design ?? null,
       mySubmissionId: mine?.id ?? null,
+      kickVotes: Object.keys(s.kickVotes).filter((id) => s.kickVotes[id].includes(viewerId)),
       myRatings: s.ratings[viewerId] ?? {},
     },
   };

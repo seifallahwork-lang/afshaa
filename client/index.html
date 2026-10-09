@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="ar" dir="rtl" translate="no">
-  <!-- translate="no": browser auto-translate rewrites the page and breaks live updates -->
   <head>
     <meta charset="UTF-8" />
     <meta name="google" content="notranslate" />
@@ -9,11 +8,19 @@
     <meta name="theme-color" content="#FFD23F" />
     <meta name="description" content="قفشة — لعبة ميمز مصرية تلعبها مع صحابك أونلاين." />
     <title>قفشة — لعبة الميمز المصرية</title>
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-48.png" sizes="48x48" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preload" href="/audio/theme.mp3" as="audio" type="audio/mpeg" />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <p style="font: 18px sans-serif; text-align: center; padding: 40px 16px">
+        قفشة محتاجة JavaScript يكون شغّال في المتصفح. شغّله وجرّب تاني.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

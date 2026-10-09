@@ -82,7 +82,7 @@ export function HomeScreen({
         <form className="panel home-form" onSubmit={(e) => run(invited ? "join" : "host", e)}>
           <div className="me-row">
             <button type="button" className="avatar-edit" onClick={() => setBuilding(true)} aria-label={t.avatarTitle}>
-              <Avatar avatar={avatar} size={104} />
+              <Avatar avatar={avatar} size={128} />
               <span className="avatar-edit-label">✏️ {t.avatarEdit}</span>
             </button>
           <label className="field">

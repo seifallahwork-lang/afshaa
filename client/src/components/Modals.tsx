@@ -22,12 +22,18 @@ export function Sheet({ onClose, children, className = "" }: { onClose: () => vo
   );
 }
 
-export function HowToPlayButton({ className = "" }: { className?: string }) {
+export function HowToPlayButton({ className = "", variant = "pill" }: { className?: string; variant?: "pill" | "icon" }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className={`pill-btn ${className}`} onClick={() => setOpen(true)}>
-        ❓ {t.howToPlay}
+      <button
+        type="button"
+        className={`${variant === "icon" ? "icon-btn" : "pill-btn"} ${className}`}
+        onClick={() => setOpen(true)}
+        aria-label={t.howToPlay}
+        title={t.howToPlay}
+      >
+        {variant === "icon" ? "❓" : `❓ ${t.howToPlay}`}
       </button>
       {open && (
         <Sheet onClose={() => setOpen(false)} className="howto">

@@ -79,6 +79,7 @@ export type ClientMessage =
   | { type: "chat"; text: string }
   | { type: "ready"; ready: boolean }
   | { type: "transferHost"; playerId: string }
+  | { type: "kickVote"; playerId: string; vote: boolean } // secret "قرار إزالة" (vote:false takes it back)
   | { type: "skip" } // host: skip the round-results wait
   | { type: "playAgain" } // host: same players, new game
   | { type: "returnToLobby" } // host
@@ -89,13 +90,14 @@ export type ClientMessage =
 export type ServerMessage =
   | { type: "state"; state: RoomView; serverNow: number }
   | { type: "error"; code: ErrorCode }
-  | { type: "closed"; reason: "EXPIRED" | "LEFT" | "INVALID_TOKEN" };
+  | { type: "closed"; reason: "EXPIRED" | "LEFT" | "INVALID_TOKEN" | "KICKED" };
 
 /** WebSocket close codes the client reacts to. */
 export const CLOSE_CODES = {
   ROOM_GONE: 4000,
   INVALID_TOKEN: 4001,
   LEFT: 4002,
+  KICKED: 4003,
 } as const;
 
 /* ---------- The per-player view of the room ---------- */
@@ -196,6 +198,8 @@ export interface RoomView {
     myDesign: MemeDesign | null;
     mySubmissionId: string | null;
     /** submissionId -> my rating */
+    /** Players I secretly voted to remove. */
+    kickVotes: string[];
     myRatings: Record<string, Rating>;
   };
 }

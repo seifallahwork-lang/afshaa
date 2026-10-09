@@ -278,3 +278,12 @@ Categories (data and settings already exist), host-chosen categories, more scori
 - Room chat: collapse button on desktop (comes back from the 💬 bubble); the bunting stays full width under the chat panel; on phones the 💬 bubble sits bottom-left.
 - Safety net: if the screen ever crashes (e.g. a browser extension or auto-translate), it redraws by itself instead of going blank; auto-translate is turned off for the page.
 - WhatsApp button opens a plain chat (no pre-written message).
+
+## 14. Changes (v3.2)
+
+- **Exit any time** (host too): 🚪 in the top bar → "نط في أوضة تانية" (type a code; you join the new room first, so a wrong code never loses your seat) or "أنا ماشي".
+- **قرار إزالة**: tap any other player's picture or name → confirm sheet → a secret removal vote. The player is removed when every other connected player has voted (votes can be taken back). Removed players can't use their old seat.
+- Language toggle and "How to play" are in the top bar during the whole game.
+- Tapping the قفشة logo goes to the home page (in a room, your seat is kept; "ارجع للأوضة" brings you back). The tab icon is the logo.
+- Bigger avatars everywhere.
+- **Browsers**: a second "legacy" build with polyfills is served automatically to older browsers; requests skip the CORS preflight (one round trip less — faster on Brave); the page preconnects to the server on load.

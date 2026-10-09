@@ -40,7 +40,7 @@ export interface Assignment {
 }
 
 export interface RoomState {
-  version: 5;
+  version: 6;
   code: string;
   createdAt: number;
   phase: Phase;
@@ -63,6 +63,10 @@ export interface RoomState {
   /** voterId -> (submissionId -> rating) */
   ratings: Record<string, Record<string, Rating>>;
   chat: ChatMessage[];
+  /** Removal votes (secret): targetId -> voter ids. */
+  kickVotes: Record<string, string[]>;
+  /** Players removed by vote (their open connections get closed with KICKED). */
+  kicked: string[];
   lastRound: RoundResult | null;
   highlights: Highlight[];
   emptySince: number | null;

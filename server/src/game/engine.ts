@@ -43,7 +43,7 @@ export const staticTemplates = (): MemeTemplate[] => getActiveTemplates();
 
 export function createRoomState(code: string, now: number): RoomState {
   return {
-    version: 5,
+    version: 6,
     code,
     createdAt: now,
     phase: "LOBBY",
@@ -61,6 +61,8 @@ export function createRoomState(code: string, now: number): RoomState {
     revealOrder: [],
     ratings: {},
     chat: [],
+    kickVotes: {},
+    kicked: [],
     lastRound: null,
     highlights: [],
     emptySince: now,
@@ -132,8 +134,18 @@ export function markDisconnected(s: RoomState, playerId: string, now: number): v
 
 /** Player pressed "leave". In the lobby they vanish; mid-game they stay on the scoreboard. */
 export function leave(s: RoomState, playerId: string, now: number): void {
+  if (!findPlayer(s, playerId)) return;
+  removePlayer(s, playerId, now);
+  advanceIfEveryoneDone(s, now);
+  tick(s, now);
+}
+
+/** Take a player out of the room (lobby: gone; mid-game: marked as left, score kept on the board). */
+function removePlayer(s: RoomState, playerId: string, now: number): void {
   const p = findPlayer(s, playerId);
   if (!p) return;
+  delete s.kickVotes[playerId];
+  for (const id of Object.keys(s.kickVotes)) s.kickVotes[id] = s.kickVotes[id].filter((v) => v !== playerId);
   if (!inGame(s)) {
     s.players = s.players.filter((x) => x.id !== playerId);
   } else {
@@ -142,8 +154,40 @@ export function leave(s: RoomState, playerId: string, now: number): void {
     p.disconnectedAt = now;
   }
   if (s.hostId === playerId) migrateHost(s);
-  advanceIfEveryoneDone(s, now);
-  tick(s, now);
+}
+
+/* ---------- "قرار إزالة": secret vote to remove a player ---------- */
+
+/** Send (or take back) a secret removal vote against another player. */
+export function voteKick(s: RoomState, voterId: string, targetId: unknown, vote: unknown, now: number): void {
+  const voter = findPlayer(s, voterId);
+  if (!voter || voter.left) throw new GameError("INVALID_TOKEN");
+  const target = typeof targetId === "string" ? findPlayer(s, targetId) : undefined;
+  if (!target || target.left || target.id === voterId) throw new GameError("INVALID_TARGET");
+  const votes = (s.kickVotes[target.id] ?? []).filter((v) => v !== voterId);
+  if (vote !== false) votes.push(voterId);
+  if (votes.length) s.kickVotes[target.id] = votes;
+  else delete s.kickVotes[target.id];
+  applyKicks(s, now);
+}
+
+/** A player is removed once every other connected player has voted to remove them. */
+function applyKicks(s: RoomState, now: number): void {
+  for (const targetId of Object.keys(s.kickVotes)) {
+    const target = findPlayer(s, targetId);
+    if (!target || target.left) {
+      delete s.kickVotes[targetId];
+      continue;
+    }
+    const others = s.players.filter((p) => !p.left && p.connected && p.id !== targetId);
+    const votes = new Set(s.kickVotes[targetId]);
+    if (others.length > 0 && others.every((p) => votes.has(p.id))) {
+      removePlayer(s, targetId, now);
+      target.token = `kicked-${randomHex(8)}`; // their saved seat no longer works
+      if (!s.kicked.includes(targetId)) s.kicked.push(targetId);
+      advanceIfEveryoneDone(s, now);
+    }
+  }
 }
 
 function migrateHost(s: RoomState): void {
@@ -494,13 +538,16 @@ export function tick(s: RoomState, now: number): boolean {
     return true; // mid-game: keep the seat and score for when they come back
   });
 
-  // 3. Host migration.
+  // 3. Removal votes (someone may have left, so the rest might now all agree).
+  applyKicks(s, now);
+
+  // 4. Host migration.
   const host = s.hostId ? findPlayer(s, s.hostId) : undefined;
   const hostGone =
     !host || host.left || (!host.connected && (host.disconnectedAt ?? now) + GAME_CONFIG.hostDisconnectGraceSeconds * S <= now);
   if (hostGone) migrateHost(s);
 
-  // 4. Expiry.
+  // 5. Expiry.
   if (connectedPlayers(s).length === 0) s.emptySince ??= now;
   else s.emptySince = null;
   if (s.emptySince !== null && now - s.emptySince >= GAME_CONFIG.emptyRoomTtlSeconds * S) return true;

@@ -75,6 +75,7 @@ export function LobbyScreen({ state, send, onLeave }: ScreenProps) {
           <span className="chip">{t.readyCount(readyCount, connected.length)}</span>
         </div>
         <PlayerList players={active} youId={state.you.id} showReady onMakeHost={isHost ? setHandOver : undefined} />
+        {active.length > 1 && <p className="hint room-tip">{t.tapToKick}</p>}
       </Panel>
 
       <Panel>

@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { WS_URL } from "../lib/config";
 
 export type ConnectionStatus = "connecting" | "open" | "reconnecting";
-export type EndReason = "EXPIRED" | "LEFT" | "INVALID_TOKEN";
+export type EndReason = "EXPIRED" | "LEFT" | "INVALID_TOKEN" | "KICKED";
 
 export interface RoomConnection {
   state: RoomView | null;
@@ -67,6 +67,7 @@ export function useRoom(session: SessionResponse): RoomConnection {
         if (e.code === CLOSE_CODES.ROOM_GONE) setEnded((r) => r ?? "EXPIRED");
         if (e.code === CLOSE_CODES.INVALID_TOKEN) setEnded((r) => r ?? "INVALID_TOKEN");
         if (e.code === CLOSE_CODES.LEFT) setEnded("LEFT");
+        if (e.code === CLOSE_CODES.KICKED) setEnded("KICKED");
         if (stopped || e.code >= 4000) return;
         setStatus("reconnecting");
         const delay = Math.min(8000, 500 * 2 ** attempt++);

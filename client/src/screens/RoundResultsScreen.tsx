@@ -64,7 +64,7 @@ export function RoundResultsScreen({ state, send, clockOffset }: ScreenProps) {
               <li key={e.submissionId}>
                 <div className="entry-head">
                   <span className="lb-rank">{e.points > 0 ? (MEDALS[i] ?? i + 1) : "·"}</span>
-                  <Avatar avatar={e.avatar} size={46} />
+                  <Avatar avatar={e.avatar} size={58} />
                   <strong className="entry-name">{e.playerName}</strong>
                   <span className="entry-stats">
                     ⭐ {e.stars}

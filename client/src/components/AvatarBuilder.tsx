@@ -37,7 +37,7 @@ export function AvatarBuilder({
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={t.avatarTitle}>
       <div className="sheet avatar-sheet">
         <div className="avatar-preview">
-          <Avatar avatar={draft} size={150} />
+          <Avatar avatar={draft} size={180} />
           <Button variant="secondary" type="button" onClick={() => setDraft(randomAvatar())}>
             🎲 {t.avatarRandom}
           </Button>
@@ -71,7 +71,7 @@ export function AvatarBuilder({
               {current.colors ? (
                 <span className="swatch-big" style={{ background: current.colors[i] }} />
               ) : (
-                <Avatar avatar={{ ...draft, [tab]: i }} size={64} />
+                <Avatar avatar={{ ...draft, [tab]: i }} size={76} />
               )}
             </button>
           ))}

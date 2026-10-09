@@ -27,7 +27,7 @@ export function FinalScreen({ state, send, onLeave }: ScreenProps) {
           <>
             <div className="winner-avatars">
               {winners.map((w) => (
-                <Avatar key={w.id} avatar={w.avatar} size={150} />
+                <Avatar key={w.id} avatar={w.avatar} size={170} />
               ))}
             </div>
             <h1 className="trophy-name">{winners.map((w) => w.name).join(" و ")}</h1>

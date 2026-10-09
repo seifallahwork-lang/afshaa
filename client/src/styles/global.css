@@ -36,8 +36,7 @@ html {
 body {
   margin: 0;
   overflow-x: hidden;
-  overflow-x: clip; /* can't be scrolled sideways by mistake */
-  min-height: 100dvh;
+  min-height: 100vh;
   background-color: var(--sign);
   /* faint halftone, like old enamel signs */
   background-image: radial-gradient(rgba(35, 25, 66, 0.07) 1.2px, transparent 1.4px);
@@ -75,6 +74,18 @@ textarea {
 :focus-visible {
   outline: 3px solid var(--magenta);
   outline-offset: 3px;
+}
+
+/* Newer browsers: a page that can't be scrolled sideways by mistake, and the real visible height on phones. */
+@supports (overflow-x: clip) {
+  body {
+    overflow-x: clip;
+  }
+}
+@supports (min-height: 100dvh) {
+  body {
+    min-height: 100dvh;
+  }
 }
 
 /* ---------- fringe (khayamiya / tuk-tuk band) ---------- */
@@ -390,7 +401,7 @@ textarea {
   margin: 0;
 }
 .loading-screen {
-  min-height: 70dvh;
+  min-height: 70vh;
   display: grid;
   place-content: center;
   text-align: center;
@@ -705,7 +716,7 @@ textarea {
 /* ---------- countdown ---------- */
 
 .countdown {
-  min-height: 62dvh;
+  min-height: 62vh;
   display: grid;
   place-content: center;
   text-align: center;
@@ -1022,7 +1033,7 @@ textarea {
 .sheet {
   position: relative;
   width: min(560px, 100%);
-  max-height: 92dvh;
+  max-height: 92vh;
   overflow-y: auto;
   background: var(--paper);
   border: var(--line);
@@ -1973,7 +1984,8 @@ textarea {
   }
 }
 .chat-sheet {
-  height: min(80dvh, 640px);
+  height: 80vh;
+  max-height: 640px;
   grid-template-rows: auto 1fr auto;
   padding-top: 12px;
 }
@@ -2078,10 +2090,10 @@ textarea {
 }
 /* Wide screens: the chat panel sits on the side; the bunting stays full width under it. */
 @media (min-width: 1100px) {
-  .room:has(> .chat-panel) {
+  .room.has-chat-panel {
     padding-inline-end: 372px;
   }
-  .room:has(> .chat-panel) > .fringe {
+  .room.has-chat-panel > .fringe {
     margin-inline-end: -372px;
   }
 }
@@ -2153,5 +2165,120 @@ textarea {
   }
   .caption-layout .submit-bar {
     grid-area: submit;
+  }
+}
+
+/* ==========================================================================
+   v3.2: tappable players (قرار إزالة), exit sheet, room tools, logo link
+   ========================================================================== */
+
+.logo-btn {
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.logo-btn:focus-visible {
+  outline: 3px solid var(--magenta);
+  outline-offset: 3px;
+}
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.player > .who,
+.leaderboard li > .who {
+  flex: 1;
+}
+.leaderboard .lb-name {
+  flex: 1;
+}
+.who-tap {
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  text-align: start;
+  cursor: pointer;
+  border-radius: 999px;
+}
+.who-tap:hover .avatar,
+.who-tap:focus-visible .avatar {
+  box-shadow: 0 0 0 3px var(--magenta);
+}
+.progress-chips .who {
+  gap: 6px;
+}
+.icon-btn-text {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.topbar-info {
+  row-gap: 6px;
+}
+.btn-danger {
+  background: #c1121f;
+  color: #fff;
+}
+.kick-who {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+.kick-who strong {
+  font-size: 1.35rem;
+}
+.kick-q {
+  font-weight: 800;
+  text-align: center;
+  font-size: 1.1rem;
+}
+.kick-sheet .hint {
+  text-align: center;
+}
+.jump-form {
+  display: grid;
+  gap: 8px;
+}
+.form-error {
+  color: #c1121f;
+  font-weight: 700;
+  margin: 0;
+}
+.divider {
+  border: 0;
+  border-top: 2px dashed rgba(35, 25, 66, 0.25);
+  margin: 14px 0;
+  width: 100%;
+}
+.exit-sheet .btn-big {
+  width: 100%;
+}
+.room-tip {
+  text-align: center;
+  margin: 8px 0 0;
+}
+
+/* Phones with a browser bar: use the real visible height where supported. */
+@supports (height: 100dvh) {
+  .loading-screen {
+    min-height: 70dvh;
+  }
+  .countdown {
+    min-height: 62dvh;
+  }
+  .sheet {
+    max-height: 92dvh;
+  }
+  .chat-sheet {
+    height: 80dvh;
   }
 }

@@ -140,6 +140,23 @@ export const franco: Dict = {
   reconnecting: "El net fasal, bne7awel nerag3ak…",
   endedExpired: "El ouda di et2afalet.",
   endedToken: "El session di 5elset. Edkhol el ouda tany bel code.",
+  endedKicked: "El la3eeba 5adou 2arar ezala, fa 5aragt men el ouda.",
+
+  kickTitle: "2arar ezala",
+  kickConfirm: (name: string) => `Mot2aked enak 3awez teb3at 2arar ezala lel la3eb «${name}»?`,
+  kickNote: "2ararak serry, ma7adesh haye3raf enak ba3atoh. El la3eb beyokhrog bas law kol el la3eeba el tanyeen ba3ato nafs el 2arar.",
+  kickSend: "Eb3at 2arar el ezala",
+  kickSent: (name: string) => `Enta ba3att 2arar ezala le «${name}» ✔`,
+  kickWithdraw: "Es7ab el 2arar",
+  tapToKick: "Dous 3ala ay la3eb 3ashan teb3at «2arar ezala».",
+
+  exitMenu: "5orooj",
+  exitTitle: "3awez te3mel eh?",
+  jumpRoom: "🔀 Nott fe ouda tanya",
+  jumpCodeLabel: "Code el ouda el tanya",
+  jumpGo: "Yalla nott",
+  imLeaving: "👋 Ana mashy",
+  goHome: "El sa7fa el ra2eeseya",
   backHome: "Erga3 lel ra2eseya",
   noServer: "El server mesh metzabat. Lazem t7ot VITE_GAME_SERVER_URL fe Vercel.",
 

@@ -46,7 +46,7 @@ function Messages({ messages, youId }: { messages: ChatMessage[]; youId: string 
     <div className="chat-list" ref={list}>
       {messages.map((m) => (
         <div key={m.id} className={`chat-msg ${m.playerId === youId ? "mine" : ""}`}>
-          {m.playerId !== youId && <Avatar avatar={m.avatar} size={30} />}
+          {m.playerId !== youId && <Avatar avatar={m.avatar} size={38} />}
           <div className="bubble">
             {m.playerId !== youId && <strong>{m.name}</strong>}
             <span dir="auto">{m.text}</span>
@@ -88,7 +88,17 @@ function Composer({ send }: { send: (m: ClientMessage) => void }) {
   );
 }
 
-export function Chat({ messages, youId, send }: { messages: ChatMessage[]; youId: string; send: (m: ClientMessage) => void }) {
+export function Chat({
+  messages,
+  youId,
+  send,
+  onDocked,
+}: {
+  messages: ChatMessage[];
+  youId: string;
+  send: (m: ClientMessage) => void;
+  onDocked?: (docked: boolean) => void;
+}) {
   const wideScreen = useWide();
   const [collapsed, setCollapsedState] = useState(loadCollapsed);
   const setCollapsed = (v: boolean) => {
@@ -101,6 +111,7 @@ export function Chat({ messages, youId, send }: { messages: ChatMessage[]; youId
   };
   // Docked side panel only on wide screens, and only while not collapsed.
   const wide = wideScreen && !collapsed;
+  useEffect(() => onDocked?.(wide), [wide, onDocked]);
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState(messages.length ? messages[messages.length - 1].id : "");
   const [flyins, setFlyins] = useState<ChatMessage[]>([]);
@@ -145,7 +156,7 @@ export function Chat({ messages, youId, send }: { messages: ChatMessage[]; youId
       <div className="flyins" aria-live="polite">
         {flyins.map((m) => (
           <button key={m.id} type="button" className="flyin" onClick={() => (wideScreen ? setCollapsed(false) : setOpen(true))}>
-            <Avatar avatar={m.avatar} size={30} />
+            <Avatar avatar={m.avatar} size={38} />
             <span>
               <strong>{m.name}: </strong>
               <span dir="auto">{m.text}</span>

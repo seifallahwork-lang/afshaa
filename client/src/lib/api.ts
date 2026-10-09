@@ -16,7 +16,9 @@ async function once(path: string, body: unknown): Promise<Response> {
   try {
     return await fetch(`${SERVER_URL}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // text/plain = a "simple" request: the browser skips the extra CORS preflight round trip
+      // (the server reads the body as JSON either way). Faster on every browser, noticeably on Brave.
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });

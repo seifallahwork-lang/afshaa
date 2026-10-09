@@ -8,6 +8,8 @@ import { t } from "../i18n";
 import type { ConnectionStatus } from "../hooks/useRoom";
 import { useCountdown } from "../hooks/useCountdown";
 import { Logo } from "./ui";
+import { HowToPlayButton } from "./Modals";
+import { usePlayerTap } from "./RoomControls";
 
 export function Timer({ endsAt, total, clockOffset }: { endsAt: number | null; total: number; clockOffset: number }) {
   const left = useCountdown(endsAt, clockOffset);
@@ -32,11 +34,23 @@ export function Timer({ endsAt, total, clockOffset }: { endsAt: number | null; t
   );
 }
 
-export function TopBar({ state, status }: { state: RoomView; status: ConnectionStatus }) {
+export function TopBar({
+  state,
+  status,
+  onHome,
+  onExit,
+  onToggleLang,
+}: {
+  state: RoomView;
+  status: ConnectionStatus;
+  onHome: () => void;
+  onExit: () => void;
+  onToggleLang: () => void;
+}) {
   const inGame = state.phase !== "LOBBY";
   return (
     <header className="topbar">
-      <Logo size="sm" />
+      <Logo size="sm" onClick={onHome} />
       <div className="topbar-info">
         {inGame && state.phase !== "FINAL_RESULTS" && <span className="chip">{t.roundOf(state.round, state.totalRounds)}</span>}
         <span className="chip chip-code" dir="ltr">
@@ -44,6 +58,13 @@ export function TopBar({ state, status }: { state: RoomView; status: ConnectionS
         </span>
         <span className={`dot ${status === "open" ? "dot-on" : "dot-off"}`} title={status} />
         <SoundControl />
+        <HowToPlayButton variant="icon" />
+        <button type="button" className="icon-btn icon-btn-text" onClick={onToggleLang} title={t.langToggle}>
+          {t.langToggle === "عربي" ? "ع" : "Fr"}
+        </button>
+        <button type="button" className="icon-btn" onClick={onExit} aria-label={t.exitMenu} title={t.exitMenu}>
+          🚪
+        </button>
       </div>
       <MyStatus state={state} />
     </header>
@@ -102,8 +123,7 @@ export function PlayerList({
     <ul className="players">
       {players.map((p) => (
         <li key={p.id} className={`player ${p.connected ? "" : "is-off"} ${showReady && p.ready ? "is-ready" : ""}`}>
-          <Avatar avatar={p.avatar} size={58} />
-          <span className="player-name">{p.name}</span>
+          <PlayerWho p={p} size={72} nameClass="player-name" />
           {p.isHost && <span className="tag tag-host">👑 {t.hostBadge}</span>}
           {p.id === youId && <span className="tag">{t.you}</span>}
           {showReady && !p.isHost && <span className={`tag ${p.ready ? "tag-ready" : "tag-off"}`}>{p.ready ? `✔ ${t.readyBadge}` : "…"}</span>}
@@ -127,12 +147,32 @@ export function ProgressChips({ players, done }: { players: PlayerView[]; done: 
         .filter((p) => !p.left)
         .map((p) => (
           <li key={p.id} className={done(p) ? "done" : p.connected ? "" : "off"}>
-            <Avatar avatar={p.avatar} size={30} />
-            {done(p) ? "✔ " : ""}
-            {p.name}
+            <PlayerWho p={p} size={40} prefix={done(p) ? "✔ " : ""} />
           </li>
         ))}
     </ul>
+  );
+}
+
+/** Avatar + name. Tapping another player opens the "قرار إزالة" sheet. */
+function PlayerWho({ p, size, nameClass = "", prefix = "", suffix = "" }: { p: PlayerView; size: number; nameClass?: string; prefix?: string; suffix?: string }) {
+  const tap = usePlayerTap(p);
+  const inner = (
+    <>
+      <Avatar avatar={p.avatar} size={size} />
+      <span className={nameClass}>
+        {prefix}
+        {p.name}
+        {suffix && <small>{suffix}</small>}
+      </span>
+    </>
+  );
+  return tap ? (
+    <button type="button" className="who who-tap" onClick={tap} title={t.kickTitle}>
+      {inner}
+    </button>
+  ) : (
+    <span className="who">{inner}</span>
   );
 }
 
@@ -155,11 +195,7 @@ export function Leaderboard({ players, youId }: { players: PlayerView[]; youId: 
       {rankPlayers(players).map((p) => (
         <li key={p.id} className={p.id === youId ? "is-you" : ""}>
           <span className="lb-rank">{MEDALS[p.rank - 1] ?? p.rank}</span>
-          <Avatar avatar={p.avatar} size={46} />
-          <span className="lb-name">
-            {p.name}
-            {p.left && <small> ({t.left})</small>}
-          </span>
+          <PlayerWho p={p} size={58} nameClass="lb-name" suffix={p.left ? ` (${t.left})` : ""} />
           <span className="lb-score">{p.score}</span>
         </li>
       ))}

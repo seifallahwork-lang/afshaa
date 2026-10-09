@@ -101,7 +101,7 @@ function VoteCard({
       {mine && <span className="vote-flag">{t.yours}</span>}
       {sub.author && !mine && (
         <span className="vote-author">
-          <Avatar avatar={sub.author.avatar} size={26} /> {t.by(sub.author.name)}
+          <Avatar avatar={sub.author.avatar} size={36} /> {t.by(sub.author.name)}
         </span>
       )}
       <MemeView template={sub.template} design={sub.design} />
