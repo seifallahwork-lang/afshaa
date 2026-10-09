@@ -115,12 +115,7 @@ export const franco: Dict = {
   submitMeme: "Ab3at el meme",
   emptyMeme: "Ekteb 7aga aw ersem el awel — mayenfa3sh teb3at meme fady.",
 
-  hintButton: "Talmee7 bel AI",
-  hintConfirm: (n: number) => `El talmee7 hay5sem mennak ${n} no2at. Mot2aked?`,
-  hintYes: "Ah, eddeeny talmee7",
   cancel: "La2 5alas",
-  hintThinking: "El AI bey-boss 3al soura… 🤔",
-  hintUsers: (names: string, n: number) => `Estakhdemo talmee7 (−${n}): ${names}`,
 
   starsLabel: "2ayyem bel ngoum",
   nStars: (n: number) => `${n} ngoum`,
@@ -136,7 +131,7 @@ export const franco: Dict = {
   volume: "Mostawa el sot",
   sfx: "El mo2asserat (el timer wel taswit)",
 
-  meetDev: "Et3arraf 3al mo6awwer",
+  meetDev: "Et3arraf 3al motawwer",
   devEmail: "Ab3at email",
   devWhatsapp: "WhatsApp",
   close: "E2fel",
@@ -158,7 +153,7 @@ export const franco: Dict = {
     "Ekteb fe morab3at el nas: es7abha, kabbarha, leffaha, 8ayyar alwanha, aw ersem ✏️ aw o2os el soura ✂️.",
     "Law el wa2t 5eles 2abl ma teb3at, elly 3amaltoh beyetba3at lewa7do.",
     "Ba3dein el kol y2ayyem memes ba3d: men ⭐ le ⭐⭐⭐⭐⭐ (kol negma be no2ta), aw 😡 (−2 le sa7eb el meme).",
-    "💡 El talmee7 bel AI bey5sem 10 no2at. Elly yegma3 aktar no2at fel a5er yeksab 🏆",
+    "Elly yegma3 aktar no2at fel a5er yeksab 🏆",
   ],
   gotIt: "Fhemt, yalla beena",
 
@@ -217,6 +212,7 @@ export const franco: Dict = {
   chatSend: "Ab3at",
   chatEmpty: "Ma7adesh katab 7aga lessa. Ebda2 enta 👋",
   chatOpen: "El chat",
+  chatCollapse: "Sa8ghar el chat",
 };
 
 export const francoErrors: Record<ErrorCode | "NETWORK", string> = {
@@ -235,9 +231,6 @@ export const francoErrors: Record<ErrorCode | "NETWORK", string> = {
   BLOCKED_WORD: "Feeh kelma mesh masmou7a. 3addelha w eb3at tany.",
   ALREADY_VOTED: "Enta 2ayyamt el meme da 5alas.",
   CANNOT_VOTE_SELF: "Mayenfa3sh t2ayyem nafsak 😏",
-  HINT_USED: "Enta 5adt talmee7 lel meme da 5alas.",
-  HINT_UNAVAILABLE: "El talmee7 mesh mota7 lel meme da.",
-  HINT_FAILED: "El AI maraddesh — rag3nalak no2atak, garrab tany.",
   INVALID_VOTE: "E5tar men 1 le 5 ngoum aw 😡.",
   INVALID_SETTINGS: "El e3dad da mesh mota7.",
   INVALID_TOKEN: "El session 5elset. Edkhol el ouda tany.",

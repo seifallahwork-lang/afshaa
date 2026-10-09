@@ -35,9 +35,6 @@ export type ErrorCode =
   | "INVALID_VOTE"
   | "INVALID_SETTINGS"
   | "INVALID_TOKEN"
-  | "HINT_USED"
-  | "HINT_UNAVAILABLE"
-  | "HINT_FAILED"
   | "NO_REROLLS"
   | "NOT_READY"
   | "CHAT_TOO_FAST"
@@ -77,7 +74,6 @@ export type ClientMessage =
   | { type: "updateSettings"; settings: Partial<GameSettings> }
   | { type: "submitMeme"; design: MemeDesign }
   | { type: "rate"; submissionId: string; stars?: number; angry?: boolean; comment?: string }
-  | { type: "requestHint" }
   | { type: "reroll" } // swap my meme template (limited per round)
   | { type: "draft"; design: MemeDesign } // autosave; auto-submitted when time runs out
   | { type: "chat"; text: string }
@@ -163,8 +159,6 @@ export interface RoundResult {
   round: number;
   entries: RoundEntry[]; // sorted, best first
   winnerIds: string[];
-  /** Names of players who paid for an AI hint this round. */
-  hintUsers: string[];
 }
 
 export interface Highlight {
@@ -190,8 +184,6 @@ export interface RoomView {
   preloadImage: string | null;
   lastRound: RoundResult | null;
   highlights: Highlight[];
-  /** Is the AI hint available for my current meme? */
-  hintsEnabled: boolean;
   chat: ChatMessage[];
   you: {
     id: string;
@@ -205,6 +197,5 @@ export interface RoomView {
     mySubmissionId: string | null;
     /** submissionId -> my rating */
     myRatings: Record<string, Rating>;
-    hint: { status: "pending" | "ready"; text: string | null } | null;
   };
 }

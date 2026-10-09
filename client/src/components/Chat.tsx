@@ -23,14 +23,27 @@ function useWide() {
   return wide;
 }
 
+const COLLAPSE_KEY = "afsha.chatCollapsed";
+const loadCollapsed = () => {
+  try {
+    return localStorage.getItem(COLLAPSE_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 function Messages({ messages, youId }: { messages: ChatMessage[]; youId: string }) {
-  const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [messages.length]);
+  const list = useRef<HTMLDivElement>(null);
+  // Scroll only the message list (never the page) to the newest message.
+  useEffect(() => {
+    const el = list.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length]);
   if (messages.length === 0) return <p className="chat-empty">{t.chatEmpty}</p>;
   return (
-    <div className="chat-list">
+    <div className="chat-list" ref={list}>
       {messages.map((m) => (
         <div key={m.id} className={`chat-msg ${m.playerId === youId ? "mine" : ""}`}>
           {m.playerId !== youId && <Avatar avatar={m.avatar} size={30} />}
@@ -41,7 +54,6 @@ function Messages({ messages, youId }: { messages: ChatMessage[]; youId: string 
           </div>
         </div>
       ))}
-      <div ref={end} />
     </div>
   );
 }
@@ -77,7 +89,18 @@ function Composer({ send }: { send: (m: ClientMessage) => void }) {
 }
 
 export function Chat({ messages, youId, send }: { messages: ChatMessage[]; youId: string; send: (m: ClientMessage) => void }) {
-  const wide = useWide();
+  const wideScreen = useWide();
+  const [collapsed, setCollapsedState] = useState(loadCollapsed);
+  const setCollapsed = (v: boolean) => {
+    setCollapsedState(v);
+    try {
+      localStorage.setItem(COLLAPSE_KEY, v ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
+  };
+  // Docked side panel only on wide screens, and only while not collapsed.
+  const wide = wideScreen && !collapsed;
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState(messages.length ? messages[messages.length - 1].id : "");
   const [flyins, setFlyins] = useState<ChatMessage[]>([]);
@@ -105,7 +128,12 @@ export function Chat({ messages, youId, send }: { messages: ChatMessage[]; youId
   if (wide) {
     return (
       <aside className="chat-panel" aria-label={t.chatTitle}>
-        <header>💬 {t.chatTitle}</header>
+        <header>
+          <span>💬 {t.chatTitle}</span>
+          <button type="button" className="chat-collapse" aria-label={t.chatCollapse} title={t.chatCollapse} onClick={() => setCollapsed(true)}>
+            {document.documentElement.dir === "rtl" ? "⇤" : "⇥"}
+          </button>
+        </header>
         <Messages messages={messages} youId={youId} />
         <Composer send={send} />
       </aside>
@@ -116,7 +144,7 @@ export function Chat({ messages, youId, send }: { messages: ChatMessage[]; youId
     <>
       <div className="flyins" aria-live="polite">
         {flyins.map((m) => (
-          <button key={m.id} type="button" className="flyin" onClick={() => setOpen(true)}>
+          <button key={m.id} type="button" className="flyin" onClick={() => (wideScreen ? setCollapsed(false) : setOpen(true))}>
             <Avatar avatar={m.avatar} size={30} />
             <span>
               <strong>{m.name}: </strong>
@@ -125,7 +153,12 @@ export function Chat({ messages, youId, send }: { messages: ChatMessage[]; youId
           </button>
         ))}
       </div>
-      <button type="button" className="chat-fab" aria-label={t.chatOpen} onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="chat-fab"
+        aria-label={t.chatOpen}
+        onClick={() => (wideScreen ? setCollapsed(false) : setOpen(true))}
+      >
         💬
         {unread > 0 && <span className="badge">{unread > 9 ? "9+" : unread}</span>}
       </button>
@@ -133,7 +166,7 @@ export function Chat({ messages, youId, send }: { messages: ChatMessage[]; youId
         <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={t.chatTitle} onClick={() => setOpen(false)}>
           <div className="sheet chat-sheet" onClick={(e) => e.stopPropagation()}>
             <header>
-              💬 {t.chatTitle}
+              <span>💬 {t.chatTitle}</span>
               <button type="button" className="close-x" aria-label={t.close} onClick={() => setOpen(false)}>
                 ✕
               </button>

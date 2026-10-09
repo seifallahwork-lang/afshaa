@@ -201,9 +201,6 @@ async function main() {
   p1.send({ type: "submitMeme", design: { boxes: [{ text: "   " }], strokes: [] } });
   await until(() => p1.errors.includes("EMPTY_CAPTION"), "empty");
   check("empty meme is rejected", p1.errors.includes("EMPTY_CAPTION"));
-  p1.send({ type: "requestHint" });
-  await until(() => p1.errors.includes("HINT_UNAVAILABLE"), "hint");
-  check("AI hint safely unavailable for built-in templates (no charge)", p1.errors.includes("HINT_UNAVAILABLE") && p1.state.players.find((p) => p.id === p1.id).score === 0);
   for (const p of [p1, p2, lateP]) p.send({ type: "submitMeme", design: meme(`كابشن ${p.name} 😂 English mix ١٢٣`) });
   await until(() => all.every((p) => p.state.phase === "REVEAL"), "REVEAL");
   check("all submitted → reveal early", all.every((p) => p.state.phase === "REVEAL"));

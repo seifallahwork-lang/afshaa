@@ -1,4 +1,3 @@
-import { GAME_CONFIG } from "@shared/config";
 import { useEffect } from "react";
 import { Avatar } from "../components/Avatar";
 import { DownloadButton, ReportButton } from "../components/MemeActions";
@@ -92,11 +91,6 @@ export function RoundResultsScreen({ state, send, clockOffset }: ScreenProps) {
               </li>
             ))}
           </ol>
-          {result.hintUsers.length > 0 && (
-            <p className="hint hint-line">
-              💡 {t.hintUsers(result.hintUsers.join("، "), GAME_CONFIG.hintCost)}
-            </p>
-          )}
         </Panel>
       )}
 

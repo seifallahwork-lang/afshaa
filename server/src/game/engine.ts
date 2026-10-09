@@ -43,7 +43,7 @@ export const staticTemplates = (): MemeTemplate[] => getActiveTemplates();
 
 export function createRoomState(code: string, now: number): RoomState {
   return {
-    version: 4,
+    version: 5,
     code,
     createdAt: now,
     phase: "LOBBY",
@@ -60,8 +60,6 @@ export function createRoomState(code: string, now: number): RoomState {
     submissions: [],
     revealOrder: [],
     ratings: {},
-    hints: {},
-    hintCache: {},
     chat: [],
     lastRound: null,
     highlights: [],
@@ -254,7 +252,6 @@ function resetToLobby(s: RoomState): void {
   s.submissions = [];
   s.revealOrder = [];
   s.ratings = {};
-  s.hints = {};
   s.lastRound = null;
   s.highlights = [];
 }
@@ -381,39 +378,6 @@ export function chat(s: RoomState, playerId: string, raw: unknown, now: number):
   if (s.chat.length > GAME_CONFIG.chatHistory) s.chat = s.chat.slice(-GAME_CONFIG.chatHistory);
 }
 
-/* ---------- AI hint (the Durable Object calls the AI between these two) ---------- */
-
-/** Charge the hint cost and mark it pending. Returns the cached hint text if there is one. */
-export function requestHint(s: RoomState, playerId: string, now: number): string | null {
-  if (s.phase !== "CAPTION" || (s.phaseEndsAt !== null && now >= s.phaseEndsAt)) throw new GameError("WRONG_PHASE");
-  const p = findPlayer(s, playerId);
-  if (!p || p.left) throw new GameError("INVALID_TOKEN");
-  const a = s.assignments[playerId];
-  if (!a) throw new GameError("HINT_UNAVAILABLE");
-  if (s.hints[playerId]?.templateId === a.template.id) throw new GameError("HINT_USED");
-  if (s.submissions.some((x) => x.playerId === playerId)) throw new GameError("ALREADY_SUBMITTED");
-  p.score -= GAME_CONFIG.hintCost;
-  const cached = s.hintCache[a.template.id];
-  s.hints[playerId] = { text: cached ?? null, templateId: a.template.id };
-  return cached ?? null;
-}
-
-/** Store the AI's answer (only if the player still has that meme this round). */
-export function resolveHint(s: RoomState, playerId: string, round: number, templateId: string, text: string): void {
-  s.hintCache[templateId] = text;
-  if (s.round !== round) return;
-  const h = s.hints[playerId];
-  if (h && h.text === null && h.templateId === templateId) h.text = text;
-}
-
-/** The AI failed: give the points back so the player can try again. */
-export function refundHint(s: RoomState, playerId: string, round: number): void {
-  if (s.round !== round || !s.hints[playerId] || s.hints[playerId].text !== null) return;
-  delete s.hints[playerId];
-  const p = findPlayer(s, playerId);
-  if (p) p.score += GAME_CONFIG.hintCost;
-}
-
 /* ------------------------------------------------------------------ */
 /* Phase transitions                                                   */
 /* ------------------------------------------------------------------ */
@@ -430,7 +394,6 @@ function beginRound(s: RoomState, now: number): void {
   s.submissions = [];
   s.revealOrder = [];
   s.ratings = {};
-  s.hints = {};
   for (const p of activePlayers(s)) assignTemplate(s, p.id);
   setPhase(s, "COUNTDOWN", now + GAME_CONFIG.countdownSeconds * S);
 }
@@ -458,8 +421,7 @@ function finishRound(s: RoomState, now: number): void {
     const p = findPlayer(s, e.playerId);
     if (p) p.score += e.points;
   }
-  const hintUsers = Object.keys(s.hints).map((id) => findPlayer(s, id)?.name ?? "؟");
-  s.lastRound = { round: s.round, entries, winnerIds, hintUsers };
+  s.lastRound = { round: s.round, entries, winnerIds };
   const best = entries[0];
   if (best && best.points > 0) {
     s.highlights.push({ round: s.round, template: best.template, design: best.design, playerName: best.playerName, points: best.points });

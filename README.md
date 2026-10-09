@@ -250,12 +250,31 @@ Categories (data and settings already exist), host-chosen categories, more scori
 | **Annotator** | ✏️ "رسم" mode: freehand pen, 6 colors, 3 widths, undo, clear | same files |
 | **No empty memes** | "ابعت الميم" stays disabled until there's text or a drawing; the server rejects empty memes too | `shared/design.ts` |
 | **Star voting** | Rate every other meme 1–5 ⭐ (+ optional comment), or 😡. Each ⭐ = +1 point, each 😡 = −2 points for the meme's author. Comments appear on the results with the voter's name | `shared/config.ts` → `angryPenalty`, `server/src/game/scoring.ts` |
-| **AI hint** | 💡 button during captioning: an AI looks at the image and gives a short Egyptian-Arabic nudge. Costs **10 points** (refunded automatically if the AI fails). Works only for Drive images | `shared/config.ts` → `hintCost`; prompt in `server/src/ai/hint.ts` |
 | **Avatars** | Build one on the home page: hairstyle (incl. hijab), hair color, skin, eye shape/color, mouth, beard, glasses, hat (incl. tarboosh), background, or 🎲 random | `client/src/components/Avatar.tsx` |
 | **Music & sounds** | Looping soundtrack (`client/public/audio/theme.mp3`), 🎵 button: on/off, volume, effects on/off (saved per device). "Beep–boop" ticks in the last 5 seconds, buzzer at 0 | `client/src/lib/sound.ts` |
 | **Meet the developer** | Button bottom-left on the home page and in the lobby | `client/src/config/developer.ts` (add your WhatsApp number there) |
 
-### AI hint setup
-Nothing to configure: `server/wrangler.jsonc` has `"ai": { "binding": "AI" }`, which uses **Cloudflare Workers AI** (model `@cf/google/gemma-4-26b-a4b-it`). It's included in the free Workers plan: 10,000 Neurons per day, and each hint costs only a small part of that. Hints are cached per meme, so the AI runs once per image.
 
-Locally (`npm run dev`) the server uses `server/wrangler.dev.jsonc`, which has no AI binding because Workers AI needs a Cloudflare login. The 💡 button is hidden in local testing and appears on the deployed site.
+## 12. Game features (v3)
+
+- **Each player gets their own meme** every round (no two players share a picture), plus a host-set number of "change meme" rerolls per round (3/5/7/10).
+- **Unfinished memes are auto-submitted** when time runs out (the editor autosaves a draft to the server).
+- **Late join**: players can join a running game; they get a meme right away if captioning is still open.
+- **Ready check**: every player taps "مستعد"; the host can only start when everyone is ready.
+- **Host tools**: hand over host (👑 next to a player), QR code of the room link, blind mode (hide/show who made each meme).
+- **Chat**: docked WhatsApp-style panel on wide screens; floating 💬 button with fly-in messages on phones.
+- **Editor**: outline, rotate (handle or ±15°), crop, caption strip outside the picture; emoji row removed.
+- **Download / Report** buttons on every meme (report opens a pre-filled Gmail draft to the developer).
+- **Your rank and score** always visible at the top; "3 من 6 خلّصوا" progress.
+- **Language**: Arabic ↔ Franco toggle on the home screen; "How to play" sheet.
+- **Rejoin**: the device remembers its seat; after a drop you get back in with your score ("ارجع للأوضة").
+- **Reliability**: the server retries internal calls and returns clear JSON errors; the site retries requests and warms the server on load.
+- **Music** starts muted on load (browsers forbid sound before a tap) and un-mutes on the first tap or scroll.
+
+## 13. Changes (v3.1)
+
+- Hint feature removed completely. `server/wrangler.dev.jsonc` is gone: `npm run dev` uses `wrangler.jsonc`.
+- Laptop/desktop caption screen: meme on the left, editing panel on its right, your rank and score under the meme. Phones are unchanged.
+- Room chat: collapse button on desktop (comes back from the 💬 bubble); the bunting stays full width under the chat panel; on phones the 💬 bubble sits bottom-left.
+- Safety net: if the screen ever crashes (e.g. a browser extension or auto-translate), it redraws by itself instead of going blank; auto-translate is turned off for the page.
+- WhatsApp button opens a plain chat (no pre-written message).

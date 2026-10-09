@@ -32,7 +32,7 @@ export function DeveloperButton({ inline = false }: { inline?: boolean }) {
               {DEVELOPER.whatsapp && (
                 <a
                   className="btn btn-whatsapp"
-                  href={`https://wa.me/${DEVELOPER.whatsapp}?text=${encodeURIComponent("أهلاً سيف، بخصوص لعبة قفشة")}`}
+                  href={`https://wa.me/${DEVELOPER.whatsapp}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

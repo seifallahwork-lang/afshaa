@@ -40,7 +40,7 @@ export interface Assignment {
 }
 
 export interface RoomState {
-  version: 4;
+  version: 5;
   code: string;
   createdAt: number;
   phase: Phase;
@@ -62,10 +62,6 @@ export interface RoomState {
   revealOrder: string[];
   /** voterId -> (submissionId -> rating) */
   ratings: Record<string, Record<string, Rating>>;
-  /** This round's AI hints: playerId -> hint (null text while the AI is thinking). */
-  hints: Record<string, { text: string | null; templateId: string }>;
-  /** AI hint per template id, so the AI runs once per meme. */
-  hintCache: Record<string, string>;
   chat: ChatMessage[];
   lastRound: RoundResult | null;
   highlights: Highlight[];

@@ -1,11 +1,10 @@
-import { GAME_CONFIG } from "@shared/config";
 import { isDesignEmpty, type MemeDesign } from "@shared/design";
 import type { MemeTemplate } from "@shared/templates";
 import { useEffect, useRef, useState } from "react";
 import { MemeEditor, newBox } from "../components/MemeEditor";
 import { DownloadButton } from "../components/MemeActions";
 import { MemeView } from "../components/MemeView";
-import { DoneProgress, ProgressChips, Timer } from "../components/game";
+import { DoneProgress, MyStatus, ProgressChips, Timer } from "../components/game";
 import { Button } from "../components/ui";
 import { useCountdown } from "../hooks/useCountdown";
 import { t } from "../i18n";
@@ -13,44 +12,6 @@ import { sound } from "../lib/sound";
 import type { ScreenProps } from "./types";
 
 const DRAFT_EVERY_MS = 2500;
-
-function HintBox({ state, send }: Pick<ScreenProps, "state" | "send">) {
-  const [confirming, setConfirming] = useState(false);
-  const hint = state.you.hint;
-  if (hint) {
-    return (
-      <div className={`hint-card ${hint.status}`} role="status">
-        <span className="hint-icon" aria-hidden="true">
-          💡
-        </span>
-        <p>{hint.status === "pending" ? t.hintThinking : hint.text}</p>
-      </div>
-    );
-  }
-  if (!state.hintsEnabled || state.you.myDesign) return null;
-  return confirming ? (
-    <div className="hint-confirm">
-      <span>{t.hintConfirm(GAME_CONFIG.hintCost)}</span>
-      <div className="row">
-        <Button
-          onClick={() => {
-            setConfirming(false);
-            send({ type: "requestHint" });
-          }}
-        >
-          {t.hintYes}
-        </Button>
-        <Button variant="secondary" onClick={() => setConfirming(false)}>
-          {t.cancel}
-        </Button>
-      </div>
-    </div>
-  ) : (
-    <button type="button" className="pill-btn hint-btn" onClick={() => setConfirming(true)}>
-      💡 {t.hintButton} <small>(−{GAME_CONFIG.hintCost})</small>
-    </button>
-  );
-}
 
 const freshDesign = (template: MemeTemplate | null): MemeDesign => ({
   boxes: [newBox(template?.captionPosition ?? "bottom")],
@@ -130,7 +91,7 @@ export function CaptionScreen({ state, send, clockOffset }: ScreenProps) {
           </div>
         </>
       ) : (
-        <>
+        <div className="caption-layout">
           <div className="caption-actions">
             <button
               type="button"
@@ -140,7 +101,9 @@ export function CaptionScreen({ state, send, clockOffset }: ScreenProps) {
             >
               {state.you.rerollsLeft > 0 ? t.rerollBtn(state.you.rerollsLeft) : t.noRerolls}
             </button>
-            <HintBox state={state} send={send} />
+          </div>
+          <div className="cap-status">
+            <MyStatus state={state} />
           </div>
           <MemeEditor key={template.id} template={template} design={design} onChange={setDesign} disabled={left === 0} />
           <div className="submit-bar">
@@ -149,7 +112,7 @@ export function CaptionScreen({ state, send, clockOffset }: ScreenProps) {
             </Button>
             <p className="hint">{empty && left > 0 ? t.emptyMeme : t.autoSubmitNote}</p>
           </div>
-        </>
+        </div>
       )}
 
       <div className="panel">

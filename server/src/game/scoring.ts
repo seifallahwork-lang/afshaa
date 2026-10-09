@@ -3,7 +3,6 @@
  *   - stars:  every ⭐ received = 1 point
  *   - angry:  every 😡 received = −angryPenalty points
  * To add a bonus later, write another rule and append it to SCORING_RULES.
- * (The AI-hint cost is charged immediately when a hint is bought, not here.)
  */
 import { GAME_CONFIG } from "../../../shared/config";
 import type { Rating, RoundComment, RoundEntry } from "../../../shared/protocol";

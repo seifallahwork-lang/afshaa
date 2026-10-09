@@ -36,6 +36,7 @@ html {
 body {
   margin: 0;
   overflow-x: hidden;
+  overflow-x: clip; /* can't be scrolled sideways by mistake */
   min-height: 100dvh;
   background-color: var(--sign);
   /* faint halftone, like old enamel signs */
@@ -1039,7 +1040,7 @@ textarea {
 .close-x {
   position: absolute;
   top: 10px;
-  left: 12px;
+  inset-inline-end: 12px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -1224,6 +1225,7 @@ textarea {
   gap: 8px;
 }
 .tool {
+  line-height: 1.1;
   min-height: 46px;
   border: 2px solid var(--ink);
   border-radius: 12px;
@@ -1316,51 +1318,6 @@ textarea {
   pointer-events: none;
 }
 
-/* ---------- AI hint ---------- */
-
-.hint-btn {
-  justify-self: start;
-  border: 2px dashed var(--ink);
-  border-radius: 999px;
-  background: var(--paper);
-  padding: 6px 14px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.hint-btn small {
-  color: var(--magenta);
-}
-.hint-confirm {
-  background: var(--paper);
-  border: var(--line);
-  border-radius: 14px;
-  padding: 12px;
-  display: grid;
-  gap: 10px;
-  font-weight: 800;
-}
-.hint-card {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  background: #fff8d6;
-  border: var(--line);
-  border-radius: 14px;
-  padding: 12px 14px;
-  font-weight: 600;
-}
-.hint-card.pending p {
-  animation: pulse 1.2s ease-in-out infinite;
-}
-.hint-icon {
-  font-size: 1.5rem;
-  line-height: 1;
-}
-@keyframes pulse {
-  50% {
-    opacity: 0.45;
-  }
-}
 
 /* ---------- rating ---------- */
 
@@ -1500,9 +1457,6 @@ textarea {
 }
 .comments small {
   color: var(--muted);
-}
-.hint-line {
-  margin-top: 10px;
 }
 .winner-avatars {
   display: flex;
@@ -1787,10 +1741,6 @@ textarea {
   gap: 8px;
   align-items: center;
 }
-.caption-actions .hint-card,
-.caption-actions .hint-confirm {
-  flex-basis: 100%;
-}
 
 /* meme stage, crop, strip, rotate */
 .meme {
@@ -1947,10 +1897,10 @@ textarea {
 .chat-fab {
   position: fixed;
   z-index: 35;
-  inset-inline-end: 12px;
-  top: calc(40px + env(safe-area-inset-top));
-  width: 50px;
-  height: 50px;
+  left: 12px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   border: var(--line);
   background: var(--teal);
@@ -2037,6 +1987,28 @@ textarea {
 .chat-sheet .close-x {
   top: -4px;
 }
+.chat-sheet header,
+.chat-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline-end: 52px;
+}
+.chat-panel header {
+  padding-inline-end: 0;
+}
+.chat-collapse {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: #fff;
+  font-weight: 800;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
 .chat-list {
   overflow-y: auto;
   display: grid;
@@ -2104,8 +2076,82 @@ textarea {
   grid-template-rows: auto 1fr auto;
   gap: 8px;
 }
+/* Wide screens: the chat panel sits on the side; the bunting stays full width under it. */
 @media (min-width: 1100px) {
-  .room {
+  .room:has(> .chat-panel) {
     padding-inline-end: 372px;
+  }
+  .room:has(> .chat-panel) > .fringe {
+    margin-inline-end: -372px;
+  }
+}
+
+/* Caption screen layout: phones keep the normal single column (the wrapper is invisible there). */
+.caption-layout {
+  display: contents;
+}
+.cap-status {
+  display: none;
+}
+:root[dir="ltr"] .tool,
+:root[dir="ltr"] .btn,
+:root[dir="ltr"] .pill-btn {
+  line-height: 1;
+}
+
+/* Laptop/desktop only: meme on one side, editing panel on its right, my rank + score under the meme. */
+@media (min-width: 1100px) {
+  .phase-caption .room-body {
+    max-width: 1100px;
+  }
+  .phase-caption .topbar .my-status {
+    display: none;
+  }
+  .caption-layout {
+    display: grid;
+    column-gap: 22px;
+    row-gap: 12px;
+    align-items: start;
+    grid-template-rows: auto auto auto auto 1fr;
+  }
+  :root[dir="rtl"] .caption-layout {
+    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+    grid-template-areas:
+      "tools actions"
+      "tools meme"
+      "tools status"
+      "tools submit"
+      "tools .";
+  }
+  :root[dir="ltr"] .caption-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+    grid-template-areas:
+      "actions tools"
+      "meme tools"
+      "status tools"
+      "submit tools"
+      ". tools";
+  }
+  .caption-layout .editor {
+    display: contents;
+  }
+  .caption-layout .caption-actions {
+    grid-area: actions;
+  }
+  .caption-layout .editor-canvas {
+    grid-area: meme;
+  }
+  .caption-layout .toolbar {
+    grid-area: tools;
+    position: sticky;
+    top: 16px;
+  }
+  .caption-layout .cap-status {
+    grid-area: status;
+    display: flex;
+    justify-content: center;
+  }
+  .caption-layout .submit-bar {
+    grid-area: submit;
   }
 }

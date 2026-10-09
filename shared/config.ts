@@ -28,8 +28,6 @@ export const GAME_CONFIG = {
   /** Hard limit on a room's lifetime. */
   maxRoomLifetimeSeconds: 3 * 60 * 60,
 
-  /** Points taken away for each "Generate hint" (AI). */
-  hintCost: 10,
   /** Points taken away for each 😡 a meme receives. */
   angryPenalty: 2,
   /** Max length of a voting comment. */

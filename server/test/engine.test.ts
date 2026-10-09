@@ -3,9 +3,6 @@ import { GAME_CONFIG } from "../../shared/config";
 import {
   addPlayer,
   rate,
-  refundHint,
-  requestHint,
-  resolveHint,
   createRoomState,
   leave,
   markConnected,
@@ -291,26 +288,6 @@ describe("meme designs", () => {
     expect(b.color).toBe("#FFFFFF");
     expect(b.bg).toBe("transparent");
     expect(b.size).toBe(14);
-  });
-});
-
-describe("AI hint", () => {
-  it("costs points once per meme, can be refunded, and is cached per meme", () => {
-    const { s, ids } = room(2);
-    startGame(s, ids[0], T0);
-    const t = toCaption(s);
-    const tpl = s.assignments[ids[0]].template.id;
-    expect(requestHint(s, ids[0], t)).toBeNull();
-    expect(s.players[0].score).toBe(-GAME_CONFIG.hintCost);
-    expectError(() => requestHint(s, ids[0], t), "HINT_USED");
-    refundHint(s, ids[0], s.round);
-    expect(s.players[0].score).toBe(0);
-    requestHint(s, ids[0], t);
-    resolveHint(s, ids[0], s.round, tpl, "بص على وشه 😂");
-    expect(buildView(s, ids[0]).you.hint).toEqual({ status: "ready", text: "بص على وشه 😂" });
-    expect(buildView(s, ids[1]).you.hint).toBeNull(); // private
-    s.hintCache[s.assignments[ids[1]].template.id] = "مخزّن";
-    expect(requestHint(s, ids[1], t)).toBe("مخزّن"); // cached: no second AI call
   });
 });
 

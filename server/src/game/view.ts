@@ -11,7 +11,7 @@ const SHOW_TEMPLATE = new Set(["CAPTION", "REVEAL", "VOTING", "ROUND_RESULTS"]);
 const SHOW_SUBMISSIONS = new Set(["REVEAL", "VOTING", "ROUND_RESULTS"]);
 const SHOW_RESULTS = new Set(["ROUND_RESULTS", "FINAL_RESULTS"]);
 
-export function buildView(s: RoomState, viewerId: string, aiAvailable = false): RoomView {
+export function buildView(s: RoomState, viewerId: string): RoomView {
   const mine = s.submissions.find((x) => x.playerId === viewerId) ?? null;
   const assignment = s.assignments[viewerId];
 
@@ -41,7 +41,6 @@ export function buildView(s: RoomState, viewerId: string, aiAvailable = false): 
       })
     : null;
 
-  const hint = s.hints[viewerId];
   const myTemplate = assignment?.template ?? null;
 
   return {
@@ -58,7 +57,6 @@ export function buildView(s: RoomState, viewerId: string, aiAvailable = false): 
     preloadImage: s.phase === "COUNTDOWN" ? (myTemplate?.image ?? null) : null,
     lastRound: SHOW_RESULTS.has(s.phase) ? s.lastRound : null,
     highlights: s.phase === "FINAL_RESULTS" ? s.highlights : [],
-    hintsEnabled: aiAvailable && Boolean(myTemplate?.id.startsWith("gd_")),
     chat: s.chat,
     you: {
       id: viewerId,
@@ -69,7 +67,6 @@ export function buildView(s: RoomState, viewerId: string, aiAvailable = false): 
       myDesign: mine?.design ?? null,
       mySubmissionId: mine?.id ?? null,
       myRatings: s.ratings[viewerId] ?? {},
-      hint: hint && hint.templateId === myTemplate?.id ? { status: hint.text === null ? "pending" : "ready", text: hint.text } : null,
     },
   };
 }
